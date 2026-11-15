@@ -1,6 +1,6 @@
 import cv2
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -55,9 +55,9 @@ class CameraCaptureDialog(QDialog):
         self.last_raw_frame = None
         self.worker.start()
 
-    def _update_frame(self, q_image, raw_frame):
+    def _update_frame(self, image: QImage, raw_frame):
         self.last_raw_frame = raw_frame
-        pixmap = QPixmap.fromImage(q_image)
+        pixmap = QPixmap.fromImage(image)
         scaled_pixmap = pixmap.scaled(
             self.video_label.size(),
             Qt.AspectRatioMode.KeepAspectRatio,

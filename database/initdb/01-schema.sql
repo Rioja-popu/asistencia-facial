@@ -38,6 +38,7 @@ CREATE TABLE jornada(
     horario_salida TIME NOT NULL,
     horario_entrada TIME NOT NULL,
     usuario_id INT NOT NULL,
+    catedra VARCHAR(255) NOT NULL,
     PRIMARY KEY(id)
 );
 CREATE TABLE usuario(

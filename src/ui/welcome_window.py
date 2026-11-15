@@ -10,10 +10,12 @@ from PySide6.QtWidgets import (
 from ui.jornada_view import JornadaView
 from ui.student_register_view import StudentRegisterView
 from ui.attendance_view import AttendanceView
+from ui.export_view import ExportReportsView
 
 class WelcomeWindow(QWidget):
-    def __init__(self, nombre_usuario):
+    def __init__(self, usuario_id, nombre_usuario):
         super().__init__()
+        self.usuario_id = usuario_id
         self.nombre_usuario = nombre_usuario
         self.setWindowTitle("Sistema de Asistencia Facial")
         self.resize(800, 500)
@@ -68,8 +70,14 @@ class WelcomeWindow(QWidget):
         self.btn_asistencia = QPushButton("📷  Asistencia por Captura")
         self.btn_jornada = QPushButton("⚙️  Configuración de Jornada")
         self.btn_registrar = QPushButton("👤  Registrar Alumno")
+        self.btn_exportar = QPushButton("📄  Exportar Informes")
 
-        for btn in (self.btn_asistencia, self.btn_jornada, self.btn_registrar):
+        for btn in (
+            self.btn_asistencia,
+            self.btn_jornada,
+            self.btn_registrar,
+            self.btn_exportar,
+        ):
             btn.setCheckable(True)
             sidebar_layout.addWidget(btn)
 
@@ -86,17 +94,18 @@ class WelcomeWindow(QWidget):
             "📷 Asistencia por Captura Facial",
             f"Bienvenido {self.nombre_usuario}.\nMódulo de captura facial listo.",
         )
-        self.view_jornada = JornadaView()
+        self.view_jornada = JornadaView(self.usuario_id)
 
         self.view_asistencia = AttendanceView(jornada_view=self.view_jornada)
         
         self.view_registrar = StudentRegisterView()
-        
+        self.view_exportar = ExportReportsView(self.usuario_id)
 
         # Agregar las vistas al contenedor apilado
         self.content_area.addWidget(self.view_asistencia)  # Índice 0
         self.content_area.addWidget(self.view_jornada)  # Índice 1
         self.content_area.addWidget(self.view_registrar)  # Índice 2
+        self.content_area.addWidget(self.view_exportar)  # Índice 3
 
         # -----------------------------------------------------------------
         # Conexiones de Eventos
@@ -104,6 +113,7 @@ class WelcomeWindow(QWidget):
         self.btn_asistencia.clicked.connect(lambda: self._cambiar_vista(0))
         self.btn_jornada.clicked.connect(lambda: self._cambiar_vista(1))
         self.btn_registrar.clicked.connect(lambda: self._cambiar_vista(2))
+        self.btn_exportar.clicked.connect(lambda: self._cambiar_vista(3))
 
         # Ensamblar estructura final
         main_layout.addWidget(sidebar_widget)
@@ -117,12 +127,15 @@ class WelcomeWindow(QWidget):
         if index != 0 and hasattr(self, "view_asistencia"):
             if self.view_asistencia.camera_open:
                 self.view_asistencia._cerrar_camara()
+        if index == 3:
+            self.view_exportar.refrescar()
         self.content_area.setCurrentIndex(index)
 
         # Marcar visualmente solo el botón activo
         self.btn_asistencia.setChecked(index == 0)
         self.btn_jornada.setChecked(index == 1)
         self.btn_registrar.setChecked(index == 2)
+        self.btn_exportar.setChecked(index == 3)
 
     def _crear_vista_placeholder(self, titulo, descripcion):
         """Crea una vista base provisional para el contenido central."""

@@ -2,6 +2,9 @@ pyside6
 opencv-python
 deepface
 tensorflow
+tf-keras
 keras
 psycopg[binary]
 python-dotenv
+openpyxl
+reportlab

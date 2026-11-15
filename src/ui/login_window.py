@@ -44,6 +44,6 @@ class LoginWindow(QWidget):
             QMessageBox.critical(self, "Error", "Credenciales incorrectas.")
             return
             
-        self.welcome_window = WelcomeWindow(usuario[1])
+        self.welcome_window = WelcomeWindow(usuario[0], usuario[1])
         self.welcome_window.show()
         self.close()

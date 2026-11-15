@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Configuración local y credenciales
+.env
+
+# Datos de alumnos: fotos y volcados de la base
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.dump
+*.backup
+backups/
+
+# Informes exportados
+*.xlsx
+*.pdf
