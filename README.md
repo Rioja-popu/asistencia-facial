@@ -76,7 +76,7 @@ python -m pytest tests
 | Pantalla | Para qué sirve |
 |---|---|
 | Marcación | Cámara, reconocimiento y confirmación de entrada o salida |
-| Docentes | Alta y edición de docentes con sus tres fotos; baja lógica (inactivo) o eliminación definitiva con todo su historial |
+| Docentes | Alta y edición de docentes con sus tres fotos; baja lógica (inactivo) o eliminación definitiva con todo su historial; importación desde un listado en Excel o CSV |
 | Carreras y cátedras | Carreras del instituto y cátedras de cada una |
 | Horarios | Día y horario en que cada docente dicta cada cátedra; importación desde una planilla de Excel |
 | Actividades especiales | Jornadas institucionales y mesas de examen, con sus docentes y roles; listado exportable a Excel y PDF |
@@ -133,6 +133,27 @@ vista previa antes de guardar.
 
 La lógica está en `src/services/importacion_service.py`. Una base creada antes de
 esta función necesita aplicar una vez `database/migraciones/01-importacion-horarios.sql`.
+
+## Importación de docentes
+
+En Docentes, "Descargar listado modelo" genera un Excel con las columnas
+APELLIDO, NOMBRE, DNI, CUIL, CELULAR y CORREO ELECTRONICO, e "Importar docentes"
+lee ese listado en Excel o CSV (separado por coma o punto y coma).
+
+- Apellido, nombre y DNI son obligatorios. DNI de 7 u 8 números y CUIL de 11; los
+  puntos y guiones se ignoran.
+- Antes de guardar se muestra una vista previa con lo que pasa con cada fila.
+- **No duplica**: si ya hay un docente con ese DNI, o con el mismo apellido y
+  nombre y sin DNI (por ejemplo, creado al importar horarios), no se crea otro:
+  se le completan los datos vacíos. Nunca se pisa un dato ya cargado.
+- Se rechazan las filas con datos inválidos, DNI o CUIL repetidos, o con el nombre
+  de un docente que ya tiene otro DNI. Si un docente nuevo se parece a uno ya
+  cargado (mismo apellido y nombre que empieza igual), se crea con un aviso.
+- Se guarda todo o nada. Los docentes importados quedan sin fotos y no pueden
+  marcar hasta que se las tomen.
+
+Conviene importar primero los docentes y después los horarios: así los horarios
+quedan asociados a docentes que ya tienen DNI y CUIL.
 
 ## Reglas de negocio
 

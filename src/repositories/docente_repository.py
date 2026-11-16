@@ -126,3 +126,38 @@ def eliminar_docente(docente_id):
                 cur.execute(f"DELETE FROM {tabla} WHERE docente_id = %s;", (docente_id,))
             cur.execute("DELETE FROM docente WHERE id = %s;", (docente_id,))
         conn.commit()
+
+
+def importar_docentes(nuevos, completados):
+    """Guarda lo que arma importacion_docentes_service.planificar, en una transacción.
+
+    Los nuevos quedan sin fotos. A los existentes sólo se les cargan los datos vacíos.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for d in nuevos:
+                cur.execute(
+                    """
+                    INSERT INTO docente (apellido, nombre, dni, cuil, celular, correo_electronico)
+                    VALUES (%s, %s, %s, %s, %s, %s);
+                    """,
+                    (
+                        d["apellido"], d["nombre"], d["dni"], d["cuil"] or None,
+                        d["celular"] or None, d["correo_electronico"] or None,
+                    ),
+                )
+            for _, docente_id, faltantes in completados:
+                cur.execute(
+                    """
+                    UPDATE docente
+                    SET dni = COALESCE(dni, %s), cuil = COALESCE(cuil, %s),
+                        celular = COALESCE(celular, %s),
+                        correo_electronico = COALESCE(correo_electronico, %s)
+                    WHERE id = %s;
+                    """,
+                    (
+                        faltantes.get("dni"), faltantes.get("cuil"), faltantes.get("celular"),
+                        faltantes.get("correo_electronico"), docente_id,
+                    ),
+                )
+        conn.commit()

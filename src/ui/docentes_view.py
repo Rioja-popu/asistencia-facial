@@ -16,8 +16,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from repositories import docente_repository
+from services import importacion_docentes_service
 from ui import theme
 from ui.camera_dialog import CameraCaptureDialog
+from ui.importar_docentes_dialog import ImportarDocentesDialog
 
 ANGULOS = [
     ("Ángulo frontal", "frontal"),
@@ -186,6 +188,12 @@ class DocentesView(QWidget):
         self.btn_eliminar = theme.boton("Eliminar docente", "peligro", self._eliminar)
         self.btn_eliminar.setEnabled(False)
         fila.addWidget(self.btn_eliminar)
+        izquierda.addLayout(fila)
+        fila = QHBoxLayout()
+        fila.addWidget(
+            theme.boton("Descargar listado modelo", "secundario", self._descargar_listado)
+        )
+        fila.addWidget(theme.boton("Importar docentes", "secundario", self._importar))
         izquierda.addLayout(fila)
         layout.addLayout(izquierda, 5)
 
@@ -358,6 +366,46 @@ class DocentesView(QWidget):
         theme.informar(self, "Docente guardado", "Los datos del docente fueron guardados.")
         self.refrescar()
         self._nuevo()
+
+    def _descargar_listado(self):
+        ruta, _ = QFileDialog.getSaveFileName(
+            self, "Guardar listado modelo", "listado_docentes.xlsx", "Excel (*.xlsx)"
+        )
+        if not ruta:
+            return
+        if not ruta.lower().endswith(".xlsx"):
+            ruta += ".xlsx"
+        try:
+            importacion_docentes_service.generar_planilla(ruta)
+        except Exception as e:
+            theme.avisar(self, "No se pudo guardar", f"No se pudo generar el listado:\n{e}")
+            return
+        theme.informar(self, "Listado generado", f"El listado se guardó en:\n{ruta}")
+
+    def _importar(self):
+        ruta, _ = QFileDialog.getOpenFileName(
+            self, "Elegir listado de docentes", "", "Excel o CSV (*.xlsx *.csv)"
+        )
+        if not ruta:
+            return
+        try:
+            docentes, errores = importacion_docentes_service.leer_listado(ruta)
+        except Exception as e:
+            theme.avisar(self, "No se pudo leer", f"No se pudo abrir el listado:\n{e}")
+            return
+        if not docentes:
+            theme.avisar(
+                self, "Nada para importar",
+                "\n".join(errores) or "El listado no tiene docentes cargados.",
+            )
+            return
+        try:
+            dialogo = ImportarDocentesDialog(docentes, self)
+        except Exception as e:
+            theme.error_bd(self, e)
+            return
+        dialogo.exec()
+        self.refrescar()
 
     def _eliminar(self):
         if self.docente_id is None:
