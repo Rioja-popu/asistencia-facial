@@ -40,8 +40,9 @@ CREATE TABLE docente(
     id SERIAL NOT NULL,
     apellido VARCHAR(255) NOT NULL,
     nombre VARCHAR(255) NOT NULL,
-    dni VARCHAR(255) NOT NULL,
-    cuil VARCHAR(255) NOT NULL,
+    -- DNI y CUIL quedan vacíos en los docentes importados hasta que se completan
+    dni VARCHAR(255) NULL,
+    cuil VARCHAR(255) NULL,
     celular VARCHAR(255) NULL,
     correo_electronico VARCHAR(255) NULL,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -79,10 +80,11 @@ CREATE TABLE horario_catedra(
     vigente_hasta DATE NULL,
     PRIMARY KEY(id),
     CONSTRAINT horario_dia_semana_check CHECK (dia_semana BETWEEN 1 AND 7),
-    -- Cada clase dura 1 h 20 min: el bloque debe medir 80, 160, 240... minutos
+    -- El cuadro de horarios se arma en módulos de 40 min: un horario dura como
+    -- mínimo una clase (1 h 20 min) y crece de a un módulo (80, 120, 160...)
     CONSTRAINT horario_duracion_check CHECK (
-        hora_fin > hora_inicio
-        AND MOD((EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)::INT, 80) = 0
+        hora_fin - hora_inicio >= INTERVAL '80 minutes'
+        AND MOD((EXTRACT(EPOCH FROM (hora_fin - hora_inicio)) / 60)::INT, 40) = 0
     ),
     CONSTRAINT horario_vigencia_check CHECK (
         vigente_hasta IS NULL OR vigente_hasta >= vigente_desde

@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from PySide6.QtCore import QDate, QTime
 from PySide6.QtWidgets import (
     QDateEdit,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
@@ -14,9 +15,11 @@ from PySide6.QtWidgets import (
 
 from repositories import academico_repository as repo
 from repositories import docente_repository
+from services import importacion_service
+from services.importacion_service import MINUTOS_CLASE, MINUTOS_MODULO
 from ui import theme
+from ui.importar_horarios_dialog import ImportarHorariosDialog
 
-MINUTOS_CLASE = 80  # Cada clase dura 1 h 20 min
 
 
 class HorariosView(QWidget):
@@ -29,8 +32,8 @@ class HorariosView(QWidget):
         layout.addWidget(theme.etiqueta("Horarios de cátedra"))
         layout.addWidget(
             theme.etiqueta(
-                "Cada clase dura 1 h 20 min. Dos clases seguidas de la misma cátedra "
-                "se cargan como un solo bloque.",
+                "Los horarios se arman en módulos de 40 min, con un mínimo de una clase "
+                "(1 h 20 min). Los módulos seguidos de la misma cátedra van en un solo bloque.",
                 "subtitulo",
             )
         )
@@ -50,6 +53,10 @@ class HorariosView(QWidget):
         )
         fila.addWidget(theme.boton("Eliminar (cargado por error)", "peligro", self._eliminar))
         fila.addStretch()
+        fila.addWidget(
+            theme.boton("Descargar planilla modelo", "secundario", self._descargar_planilla)
+        )
+        fila.addWidget(theme.boton("Importar desde Excel", "secundario", self._importar))
         layout.addLayout(fila)
 
         layout.addWidget(theme.etiqueta("Agregar horario", "seccion"))
@@ -61,7 +68,7 @@ class HorariosView(QWidget):
         self.time_inicio = QTimeEdit(QTime(8, 0))
         self.time_inicio.setDisplayFormat("HH:mm")
         self.spin_clases = QSpinBox()
-        self.spin_clases.setRange(1, 4)
+        self.spin_clases.setRange(MINUTOS_CLASE // MINUTOS_MODULO, 8)
         self.lbl_fin = theme.etiqueta("", "subtitulo")
         self.date_desde = QDateEdit(QDate.currentDate())
         self.date_desde.setDisplayFormat("dd/MM/yyyy")
@@ -69,7 +76,7 @@ class HorariosView(QWidget):
         form.addRow("Cátedra:", self.combo_catedra)
         form.addRow("Día:", self.combo_dia)
         form.addRow("Hora de inicio:", self.time_inicio)
-        form.addRow("Cantidad de clases seguidas:", self.spin_clases)
+        form.addRow("Módulos de 40 min seguidos:", self.spin_clases)
         form.addRow("Hora de fin:", self.lbl_fin)
         form.addRow("Vigente desde:", self.date_desde)
         layout.addWidget(tarjeta)
@@ -81,7 +88,7 @@ class HorariosView(QWidget):
 
     def _hora_fin(self):
         inicio = datetime.combine(date.today(), self.time_inicio.time().toPython())
-        return inicio + timedelta(minutes=MINUTOS_CLASE * self.spin_clases.value())
+        return inicio + timedelta(minutes=MINUTOS_MODULO * self.spin_clases.value())
 
     def _actualizar_fin(self):
         self.lbl_fin.setText(self._hora_fin().strftime("%H:%M"))
@@ -195,3 +202,38 @@ class HorariosView(QWidget):
             else:
                 theme.error_bd(self, e)
         self._cargar_horarios()
+
+    def _descargar_planilla(self):
+        ruta, _ = QFileDialog.getSaveFileName(
+            self, "Guardar planilla modelo", "planilla_horarios.xlsx", "Excel (*.xlsx)"
+        )
+        if not ruta:
+            return
+        if not ruta.lower().endswith(".xlsx"):
+            ruta += ".xlsx"
+        try:
+            importacion_service.generar_planilla(ruta)
+        except Exception as e:
+            theme.avisar(self, "No se pudo guardar", f"No se pudo generar la planilla:\n{e}")
+            return
+        theme.informar(self, "Planilla generada", f"La planilla se guardó en:\n{ruta}")
+
+    def _importar(self):
+        ruta, _ = QFileDialog.getOpenFileName(
+            self, "Elegir planilla de horarios", "", "Excel (*.xlsx)"
+        )
+        if not ruta:
+            return
+        try:
+            bloques, errores = importacion_service.leer_planilla(ruta)
+        except Exception as e:
+            theme.avisar(self, "No se pudo leer", f"No se pudo abrir la planilla:\n{e}")
+            return
+        if not bloques:
+            theme.avisar(
+                self, "Nada para importar",
+                "\n".join(errores) or "La planilla no tiene horarios cargados.",
+            )
+            return
+        ImportarHorariosDialog(bloques, errores, self).exec()
+        self.refrescar()

@@ -259,7 +259,7 @@ class DocentesView(QWidget):
         theme.llenar_tabla(
             self.tabla,
             [
-                [theme.nombre_docente(d), d["cuil"], "Activo" if d["activo"] else "Inactivo"]
+                [theme.nombre_docente(d), d["cuil"] or "Sin cargar", "Activo" if d["activo"] else "Inactivo"]
                 for d in docentes
             ],
             [d["id"] for d in docentes],
@@ -293,8 +293,8 @@ class DocentesView(QWidget):
         self.lbl_formulario.setText(f"Editar docente: {theme.nombre_docente(docente)}")
         self.input_apellido.setText(docente["apellido"])
         self.input_nombre.setText(docente["nombre"])
-        self.input_dni.setText(docente["dni"])
-        self.input_cuil.setText(docente["cuil"])
+        self.input_dni.setText(docente["dni"] or "")
+        self.input_cuil.setText(docente["cuil"] or "")
         self.input_celular.setText(docente["celular"] or "")
         self.input_correo.setText(docente["correo_electronico"] or "")
         self.chk_activo.setChecked(docente["activo"])

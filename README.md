@@ -78,7 +78,7 @@ python -m pytest tests
 | Marcación | Cámara, reconocimiento y confirmación de entrada o salida |
 | Docentes | Alta y edición de docentes con sus tres fotos; baja lógica (inactivo) o eliminación definitiva con todo su historial |
 | Carreras y cátedras | Carreras del instituto y cátedras de cada una |
-| Horarios | Día y horario en que cada docente dicta cada cátedra |
+| Horarios | Día y horario en que cada docente dicta cada cátedra; importación desde una planilla de Excel |
 | Actividades especiales | Jornadas institucionales y mesas de examen, con sus docentes y roles; listado exportable a Excel y PDF |
 | Ausencias | Particulares y ausencias médicas, con seguimiento del certificado |
 | Informes | Situación de cada obligación de un docente en un período; Excel y PDF |
@@ -90,7 +90,7 @@ El esquema completo está en `database/initdb/01-schema.sql`.
 | Tabla | Contenido |
 |---|---|
 | `usuario` | Personal administrativo que inicia sesión |
-| `docente` | Docentes que marcan asistencia; `activo` permite la baja sin borrar historial |
+| `docente` | Docentes que marcan asistencia; `activo` permite la baja sin borrar historial. DNI y CUIL pueden quedar vacíos en los docentes importados |
 | `foto_docente` | Tres fotos por docente (frontal, lateral izquierdo, lateral derecho) |
 | `carrera`, `catedra` | Cada cátedra pertenece a una carrera |
 | `horario_catedra` | Obligación semanal: docente, cátedra, día, horario y período de vigencia |
@@ -110,14 +110,38 @@ Cambios respecto del sistema original:
   horario previsto de ese día para que el informe no cambie si después se
   modifica el horario.
 
+## Importación de horarios
+
+En **Horarios**, "Descargar planilla modelo" genera un Excel con el mismo cuadro
+que usa el instituto: una hoja por curso, con la carrera y el curso arriba y una
+grilla de módulos por día. Cada celda se completa como
+`MATERIA - APELLIDO, NOMBRE`. "Importar desde Excel" lee la planilla y muestra una
+vista previa antes de guardar.
+
+- Los módulos seguidos de la misma cátedra y docente se unen en un solo horario.
+- Las carreras, cátedras y docentes que ya existen se reutilizan (se comparan sin
+  distinguir mayúsculas ni tildes); los que faltan se crean.
+- Un horario que ya estaba cargado se omite, así que importar dos veces la misma
+  planilla no duplica nada.
+- No se importan los horarios que duran menos de una clase, los que se superponen
+  con otro del mismo docente ni las celdas mal escritas: se listan con el motivo.
+- Todo se guarda en una sola transacción: si algo falla, no queda nada a medias.
+- Los docentes creados por la importación quedan sin DNI, CUIL ni fotos, y hay que
+  completarlos en **Docentes** para que puedan marcar.
+
+La lógica está en `src/services/importacion_service.py`. Una base creada antes de
+esta función necesita aplicar una vez `database/migraciones/01-importacion-horarios.sql`.
+
 ## Reglas de negocio
 
 Están en `src/services/marcacion_service.py` (qué registrar) y
 `src/services/situacion_service.py` (cómo se informa).
 
-- **Duración de la clase**: 1 h 20 min. Un horario dura 80 minutos o un múltiplo
-  (dos clases seguidas de la misma cátedra se cargan como un bloque). Lo valida la
-  pantalla y también un `CHECK` de la base.
+- **Duración de la clase**: 1 h 20 min, que es el mínimo de un horario. El cuadro
+  de horarios del instituto se arma en módulos de 40 minutos y hay cátedras de tres
+  módulos seguidos, así que un horario dura 80 minutos y crece de a 40 (80, 120,
+  160...). Los módulos seguidos de la misma cátedra se cargan como un bloque. Lo
+  valida la pantalla y también un `CHECK` de la base.
 - **Tardanza**: entrada registrada pasados 5 minutos del inicio previsto. A los 5
   minutos exactos todavía es "en horario".
 - **Salida anticipada**: salida registrada antes del fin previsto.

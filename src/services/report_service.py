@@ -38,7 +38,7 @@ def datos_encabezado(docente, desde, hasta, usuario, particulares):
     """particulares: [(año, usados, límite), ...]"""
     datos = [
         ("Docente:", f"{docente['apellido']}, {docente['nombre']}"),
-        ("DNI / CUIL:", f"{docente['dni']} / {docente['cuil']}"),
+        ("DNI / CUIL:", f"{docente['dni'] or 'Sin cargar'} / {docente['cuil'] or 'Sin cargar'}"),
         ("Período:", f"{formatear_fecha(desde)} al {formatear_fecha(hasta)}"),
     ]
     for anio, usados, limite in particulares:
