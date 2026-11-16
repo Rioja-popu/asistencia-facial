@@ -6,21 +6,21 @@ from deepface import DeepFace
 class FacialRecognitionService:
 
     def __init__(self):
-        self.reference_embeddings = []  # Lista de dicts: {'alumno_id': x, 'nombre': y, 'embedding': vec}
+        self.reference_embeddings = []  # Lista de dicts: {'docente_id': x, 'nombre': y, 'embedding': vec}
         # Pre-cargar el modelo para agilizar la inferencia posterior
         DeepFace.build_model("Facenet512")
 
-    def cargar_referencias_desde_db(self, alumnos_db):
+    def cargar_referencias_desde_db(self, docentes_db):
         """
-        Recibe la lista de alumnos recuperados de PostgreSQL y genera sus embeddings de referencia.
-        alumnos_db = [(id, nombre, apellido, bytes_frente, bytes_izq, bytes_der), ...]
+        Recibe la lista de docentes recuperados de PostgreSQL y genera sus embeddings de referencia.
+        docentes_db = [(id, nombre, apellido, bytes_frente, bytes_izq, bytes_der), ...]
         """
         self.reference_embeddings.clear()
 
-        for alumno in alumnos_db:
-            alumno_id = alumno[0]
-            nombre_completo = f"{alumno[1]} {alumno[2]}"
-            fotos_bytes = [alumno[3], alumno[4], alumno[5]]  # frente, izq, der
+        for docente in docentes_db:
+            docente_id = docente[0]
+            nombre_completo = f"{docente[1]} {docente[2]}"
+            fotos_bytes = [docente[3], docente[4], docente[5]]  # frente, izq, der
 
             for img_bytes in fotos_bytes:
                 if img_bytes:
@@ -28,7 +28,7 @@ class FacialRecognitionService:
                     if embedding is not None:
                         self.reference_embeddings.append(
                             {
-                                "alumno_id": alumno_id,
+                                "docente_id": docente_id,
                                 "nombre": nombre_completo,
                                 "embedding": embedding,
                             }

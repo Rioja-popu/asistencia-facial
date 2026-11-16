@@ -16,7 +16,7 @@ class CameraCaptureDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Tomar Foto - Captura de Rostro")
+        self.setWindowTitle("Tomar foto del docente")
         self.setFixedSize(640, 520)
 
         self.captured_frame_bytes = None  # Almacenará la foto tomada en bytes

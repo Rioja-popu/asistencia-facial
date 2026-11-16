@@ -8,9 +8,9 @@ class CameraWorker(QThread):
     # Señales para comunicar con la UI
     frame_received = Signal(QImage, object)  # (QImage para la UI, fotograma original de cv2)
     status_changed = Signal(str)  # Mensaje de estado ("Esperando rostro", etc.)
-    alumno_reconocido = Signal(
+    docente_reconocido = Signal(
         dict, float
-    )  # Emitir datos del alumno y la distancia si pasa el umbral
+    )  # Emitir datos del docente y la distancia si pasa el umbral
 
     def __init__(self, facial_service=None, camera_index=0):
         super().__init__()
@@ -27,6 +27,17 @@ class CameraWorker(QThread):
         self.last_recognition_time = 0
         self.recognition_interval = 2.0  # segundos
         self.is_processing = False
+        # Mientras se espera la confirmación del docente la cámara sigue mostrando
+        # video, pero no se hacen nuevos intentos de reconocimiento
+        self.reconocimiento_pausado = False
+
+    def pausar_reconocimiento(self):
+        self.reconocimiento_pausado = True
+
+    def reanudar_reconocimiento(self):
+        # Se espera el intervalo completo antes del próximo intento
+        self.last_recognition_time = time.time()
+        self.reconocimiento_pausado = False
 
     def run(self):
         self._is_running = True
@@ -48,9 +59,10 @@ class CameraWorker(QThread):
             # Volteo horizontal para efecto espejo
             frame = cv2.flip(frame, 1)
 
-            # Detección de rostros: sólo en asistencia, no al tomar la foto de registro
+            # Detección de rostros: sólo en la marcación, no al tomar la foto de registro,
+            # y nunca mientras hay una confirmación pendiente
             faces = []
-            if self.facial_service:
+            if self.facial_service and not self.reconocimiento_pausado:
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 faces = self.face_cascade.detectMultiScale(
                     gray, scaleFactor=1.1, minNeighbors=5, minSize=(100, 100)
@@ -58,7 +70,9 @@ class CameraWorker(QThread):
 
             num_faces = len(faces)
 
-            if num_faces == 0:
+            if self.reconocimiento_pausado:
+                self.status_changed.emit("Esperando confirmación...")
+            elif num_faces == 0:
                 self.status_changed.emit("Esperando rostro...")
             elif num_faces > 1:
                 self.status_changed.emit("Más de un rostro detectado")
@@ -96,13 +110,16 @@ class CameraWorker(QThread):
                     )
 
                     if match:
+                        # Se pausa en este mismo hilo, antes de avisar a la interfaz,
+                        # para que no pueda dispararse otro reconocimiento en el medio
+                        self.reconocimiento_pausado = True
                         self.status_changed.emit(
-                            f"Alumno reconocido: {match['nombre']} (Dist: {distance:.2f})"
+                            f"Docente reconocido: {match['nombre']}"
                         )
-                        self.alumno_reconocido.emit(match, distance)
+                        self.docente_reconocido.emit(match, distance)
                     else:
                         self.status_changed.emit(
-                            f"Rostro no reconocido (Dist mínima: {distance:.2f})"
+                            "Rostro no reconocido: no coincide con ningún docente registrado"
                         )
 
                     self.is_processing = False
