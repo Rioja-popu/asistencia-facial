@@ -98,3 +98,31 @@ def obtener_docentes_con_fotos():
 def docente_esta_activo(docente_id):
     filas = consultar("SELECT activo FROM docente WHERE id = %s;", (docente_id,))
     return bool(filas) and filas[0]["activo"]
+
+
+def contar_registros_asociados(docente_id):
+    """Cantidad de datos que se perderían al eliminar al docente."""
+    return consultar(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM horario_catedra WHERE docente_id = %(id)s) AS horarios,
+            (SELECT COUNT(*) FROM actividad_docente WHERE docente_id = %(id)s) AS actividades,
+            (SELECT COUNT(*) FROM asistencia WHERE docente_id = %(id)s) AS asistencias,
+            (SELECT COUNT(*) FROM ausencia WHERE docente_id = %(id)s) AS ausencias;
+        """,
+        {"id": docente_id},
+    )[0]
+
+
+def eliminar_docente(docente_id):
+    """Borra al docente con todo su historial, en una sola transacción.
+
+    Las fotos se borran solas (ON DELETE CASCADE); el resto se borra acá en el
+    orden que exigen las claves foráneas.
+    """
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for tabla in ("asistencia", "ausencia", "actividad_docente", "horario_catedra"):
+                cur.execute(f"DELETE FROM {tabla} WHERE docente_id = %s;", (docente_id,))
+            cur.execute("DELETE FROM docente WHERE id = %s;", (docente_id,))
+        conn.commit()

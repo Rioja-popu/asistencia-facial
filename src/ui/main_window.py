@@ -76,7 +76,7 @@ class MainWindow(QWidget):
             ("Docentes", DocentesView()),
             ("Carreras y cátedras", CatedrasView()),
             ("Horarios", HorariosView()),
-            ("Actividades especiales", ActividadesView()),
+            ("Actividades especiales", ActividadesView(self.nombre_usuario)),
             ("Ausencias", AusenciasView(self.usuario_id)),
             ("Informes", InformesView(self.nombre_usuario)),
         ]

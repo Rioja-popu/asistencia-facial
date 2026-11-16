@@ -68,3 +68,27 @@ def test_pdf_se_genera(tmp_path):
         report_service.generar_pdf(ruta, ENCABEZADO, datos)
         with open(ruta, "rb") as archivo:
             assert archivo.read(5) == b"%PDF-"
+
+
+def test_filas_actividades_incluye_catedra_roles_y_actividad_sin_docentes():
+    from datetime import date, time
+
+    mesa = {
+        "tipo": "mesa_examen", "descripcion": "Final", "catedra": "Programación I",
+        "fecha": date(2026, 12, 16), "hora_inicio": time(8, 0), "hora_fin": time(10, 0),
+    }
+    jornada = {
+        "tipo": "jornada_institucional", "descripcion": "Jornada", "catedra": None,
+        "fecha": date(2026, 11, 18), "hora_inicio": time(9, 0), "hora_fin": time(12, 0),
+    }
+    participantes = [{"apellido": "Rojas", "nombre": "Santiago", "rol": "presidente"}]
+    filas = report_service.filas_actividades(
+        [(mesa, participantes), (jornada, [])],
+        {"mesa_examen": "Mesa de examen", "jornada_institucional": "Jornada institucional"},
+        {"presidente": "Presidente"},
+    )
+    assert filas[0] == [
+        "16/12/2026", "Miércoles", "08:00 - 10:00", "Mesa de examen",
+        "Final (Programación I)", "Rojas, Santiago (Presidente)",
+    ]
+    assert filas[1][5] == "Sin docentes asignados"

@@ -76,10 +76,10 @@ python -m pytest tests
 | Pantalla | Para qué sirve |
 |---|---|
 | Marcación | Cámara, reconocimiento y confirmación de entrada o salida |
-| Docentes | Alta y edición de docentes con sus tres fotos; baja lógica (inactivo) |
+| Docentes | Alta y edición de docentes con sus tres fotos; baja lógica (inactivo) o eliminación definitiva con todo su historial |
 | Carreras y cátedras | Carreras del instituto y cátedras de cada una |
 | Horarios | Día y horario en que cada docente dicta cada cátedra |
-| Actividades especiales | Jornadas institucionales y mesas de examen, con sus docentes y roles |
+| Actividades especiales | Jornadas institucionales y mesas de examen, con sus docentes y roles; listado exportable a Excel y PDF |
 | Ausencias | Particulares y ausencias médicas, con seguimiento del certificado |
 | Informes | Situación de cada obligación de un docente en un período; Excel y PDF |
 

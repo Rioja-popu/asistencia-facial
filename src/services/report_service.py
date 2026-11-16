@@ -214,3 +214,143 @@ def generar_pdf(ruta, encabezado, filas, ruta_escudo=None):
     )
     elementos += [Spacer(1, 0.5 * cm), resumen]
     doc.build(elementos)
+
+
+# ------------------------------------------------------- actividades especiales
+TITULO_ACTIVIDADES = "Actividades especiales"
+COLUMNAS_ACTIVIDADES = ["Fecha", "Día", "Horario", "Tipo", "Descripción", "Docentes"]
+MENSAJE_SIN_ACTIVIDADES = "No hay actividades especiales registradas."
+
+
+def filas_actividades(actividades, tipos, roles):
+    """actividades: [(actividad, participantes), ...] en el orden a mostrar."""
+    filas = []
+    for actividad, participantes in actividades:
+        descripcion = actividad["descripcion"]
+        if actividad.get("catedra"):
+            descripcion += f" ({actividad['catedra']})"
+        docentes = []
+        for p in participantes:
+            nombre = f"{p['apellido']}, {p['nombre']}"
+            if p.get("rol"):
+                nombre += f" ({roles.get(p['rol'], p['rol'])})"
+            docentes.append(nombre)
+        filas.append(
+            [
+                formatear_fecha(actividad["fecha"]),
+                DIAS[actividad["fecha"].weekday()],
+                f"{formatear_hora(actividad['hora_inicio'])} - "
+                f"{formatear_hora(actividad['hora_fin'])}",
+                tipos.get(actividad["tipo"], actividad["tipo"]),
+                descripcion,
+                "; ".join(docentes) if docentes else "Sin docentes asignados",
+            ]
+        )
+    return filas
+
+
+def _texto_total_actividades(filas):
+    cantidad = len(filas)
+    return f"Total: {cantidad} actividad" + ("" if cantidad == 1 else "es")
+
+
+def generar_excel_actividades(ruta, filas, usuario):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Actividades"
+    borde = Border(*(Side(style="thin", color="999999"),) * 4)
+    centrado = Alignment(horizontal="center", vertical="top")
+    ultima = len(COLUMNAS_ACTIVIDADES)
+
+    for fila, texto, tamano in ((1, INSTITUCION, 14), (2, TITULO_ACTIVIDADES, 12)):
+        ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=ultima)
+        celda = ws.cell(row=fila, column=1, value=texto)
+        celda.font = Font(bold=True, size=tamano, color=AZUL)
+        celda.alignment = Alignment(horizontal="center")
+    ws.cell(row=4, column=1, value="Generado por:").font = Font(bold=True)
+    ws.cell(row=4, column=3, value=usuario)
+
+    fila = 6
+    if filas:
+        for columna, titulo in enumerate(COLUMNAS_ACTIVIDADES, start=1):
+            celda = ws.cell(row=fila, column=columna, value=titulo)
+            celda.font = Font(bold=True, color="FFFFFF")
+            celda.fill = PatternFill("solid", fgColor=AZUL)
+            celda.alignment = Alignment(horizontal="center")
+            celda.border = borde
+        fila += 1
+        for datos in filas:
+            for columna, valor in enumerate(datos, start=1):
+                celda = ws.cell(row=fila, column=columna, value=valor)
+                celda.border = borde
+                celda.alignment = (
+                    centrado if columna <= 3 else Alignment(wrap_text=True, vertical="top")
+                )
+            fila += 1
+        fila += 1
+        ws.cell(row=fila, column=1, value=_texto_total_actividades(filas)).font = Font(bold=True)
+    else:
+        ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=ultima)
+        ws.cell(row=fila, column=1, value=MENSAJE_SIN_ACTIVIDADES)
+
+    for letra, ancho in zip("ABCDEF", (12, 12, 15, 22, 45, 60)):
+        ws.column_dimensions[letra].width = ancho
+    wb.save(ruta)
+
+
+def generar_pdf_actividades(ruta, filas, usuario, ruta_escudo=None):
+    estilos = getSampleStyleSheet()
+    normal = estilos["Normal"]
+    celda = ParagraphStyle("celda", parent=normal, fontSize=8, leading=10)
+    azul = colors.HexColor("#" + AZUL)
+    titulo = ParagraphStyle("titulo", parent=estilos["Title"], textColor=azul, fontSize=16)
+    subtitulo = ParagraphStyle(
+        "subtitulo", parent=estilos["Heading2"], textColor=azul, alignment=1
+    )
+    doc = SimpleDocTemplate(
+        ruta,
+        pagesize=landscape(A4),
+        leftMargin=1.5 * cm,
+        rightMargin=1.5 * cm,
+        topMargin=1.5 * cm,
+        bottomMargin=1.5 * cm,
+        title=TITULO_ACTIVIDADES,
+    )
+    elementos = []
+    if ruta_escudo:
+        elementos.append(Image(ruta_escudo, width=2.2 * cm, height=2.2 * cm))
+    elementos += [
+        Paragraph(INSTITUCION, titulo),
+        Paragraph(TITULO_ACTIVIDADES, subtitulo),
+        Paragraph(f"<b>Generado por:</b> {usuario}", normal),
+        Spacer(1, 0.5 * cm),
+    ]
+    if filas:
+        datos = [COLUMNAS_ACTIVIDADES] + [
+            [f[0], f[1], f[2], Paragraph(f[3], celda), Paragraph(f[4], celda), Paragraph(f[5], celda)]
+            for f in filas
+        ]
+        tabla = Table(
+            datos,
+            colWidths=[c * cm for c in (2.2, 2.2, 2.8, 3.6, 7.2, 8.5)],
+            repeatRows=1,
+        )
+        tabla.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), azul),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                    ("ALIGN", (0, 1), (2, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#999999")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#eef3f9")]),
+                ]
+            )
+        )
+        elementos += [tabla, Spacer(1, 0.4 * cm), Paragraph(_texto_total_actividades(filas), normal)]
+    else:
+        elementos.append(Paragraph(MENSAJE_SIN_ACTIVIDADES, normal))
+    doc.build(elementos)

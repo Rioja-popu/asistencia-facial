@@ -1,9 +1,11 @@
 from PySide6.QtCore import QDate, QTime
 from PySide6.QtWidgets import (
     QDateEdit,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QHBoxLayout,
+    QHeaderView,
     QLineEdit,
     QTimeEdit,
     QVBoxLayout,
@@ -13,6 +15,7 @@ from PySide6.QtWidgets import (
 from repositories import academico_repository, docente_repository
 from repositories import actividad_repository as repo
 from repositories.asistencia_repository import ROLES, TIPOS_ACTIVIDAD
+from services import report_service
 from ui import theme
 
 MESA = "mesa_examen"
@@ -22,8 +25,9 @@ JORNADA = "jornada_institucional"
 class ActividadesView(QWidget):
     """Jornadas institucionales y mesas de examen, con sus participantes."""
 
-    def __init__(self):
+    def __init__(self, nombre_usuario=""):
         super().__init__()
+        self.nombre_usuario = nombre_usuario
         layout = QHBoxLayout(self)
         layout.setContentsMargins(30, 20, 30, 20)
         layout.setSpacing(20)
@@ -39,6 +43,9 @@ class ActividadesView(QWidget):
             )
         )
         self.tabla = theme.crear_tabla(["Fecha", "Horario", "Tipo", "Descripción", "Docentes"])
+        encabezado = self.tabla.horizontalHeader()
+        for columna in (0, 1, 2, 4):
+            encabezado.setSectionResizeMode(columna, QHeaderView.ResizeMode.ResizeToContents)
         self.tabla.itemSelectionChanged.connect(self._cargar_participantes)
         izquierda.addWidget(self.tabla)
 
@@ -67,6 +74,14 @@ class ActividadesView(QWidget):
         fila.addWidget(theme.boton("Agregar actividad", "confirmar", self._agregar))
         fila.addWidget(theme.boton("Eliminar", "peligro", self._eliminar))
         izquierda.addLayout(fila)
+        fila = QHBoxLayout()
+        fila.addWidget(
+            theme.boton("Exportar a Excel", "secundario", lambda: self._exportar("xlsx"))
+        )
+        fila.addWidget(
+            theme.boton("Exportar a PDF", "secundario", lambda: self._exportar("pdf"))
+        )
+        izquierda.addLayout(fila)
         layout.addLayout(izquierda, 6)
 
         # Participantes
@@ -91,7 +106,8 @@ class ActividadesView(QWidget):
     def _tipo_cambiado(self):
         self.combo_catedra.setEnabled(self.combo_tipo.currentData() == MESA)
 
-    def refrescar(self):
+    def refrescar(self, mantener_seleccion=False):
+        """Al entrar a la pantalla o terminar una acción, la lista queda sin selección."""
         try:
             actividades = repo.listar_actividades()
             docentes = docente_repository.listar_docentes(solo_activos=True)
@@ -100,7 +116,7 @@ class ActividadesView(QWidget):
             theme.error_bd(self, e)
             return
         self.actividades = {a["id"]: a for a in actividades}
-        seleccion = theme.id_seleccionado(self.tabla)
+        seleccion = theme.id_seleccionado(self.tabla) if mantener_seleccion else None
         self.tabla.blockSignals(True)
         theme.llenar_tabla(
             self.tabla,
@@ -218,7 +234,7 @@ class ActividadesView(QWidget):
                 theme.avisar(self, "Docente repetido", "Ese docente ya está en la actividad.")
             else:
                 theme.error_bd(self, e)
-        self.refrescar()
+        self.refrescar(mantener_seleccion=True)
 
     def _agregar_todos(self):
         actividad_id = self._actividad_seleccionada()
@@ -234,7 +250,7 @@ class ActividadesView(QWidget):
             repo.agregar_todos_los_docentes(actividad_id)
         except Exception as e:
             theme.error_bd(self, e)
-        self.refrescar()
+        self.refrescar(mantener_seleccion=True)
 
     def _quitar_docente(self):
         participacion_id = theme.id_seleccionado(self.tabla_participantes)
@@ -250,4 +266,36 @@ class ActividadesView(QWidget):
                 )
             else:
                 theme.error_bd(self, e)
-        self.refrescar()
+        self.refrescar(mantener_seleccion=True)
+
+    def _exportar(self, extension):
+        if not self.actividades:
+            theme.avisar(self, "Sin actividades", "No hay actividades para exportar.")
+            return
+        filtro = "Excel (*.xlsx)" if extension == "xlsx" else "PDF (*.pdf)"
+        ruta, _ = QFileDialog.getSaveFileName(
+            self, "Guardar listado de actividades",
+            f"actividades_especiales.{extension}", filtro,
+        )
+        if not ruta:
+            return
+        if not ruta.lower().endswith("." + extension):
+            ruta += "." + extension
+        try:
+            filas = report_service.filas_actividades(
+                [
+                    (a, repo.listar_participantes(a["id"]))
+                    for a in self.actividades.values()
+                ],
+                TIPOS_ACTIVIDAD, ROLES,
+            )
+            if extension == "xlsx":
+                report_service.generar_excel_actividades(ruta, filas, self.nombre_usuario)
+            else:
+                report_service.generar_pdf_actividades(
+                    ruta, filas, self.nombre_usuario, theme.RUTA_ESCUDO
+                )
+        except Exception as e:
+            theme.avisar(self, "No se pudo exportar", f"No se pudo generar el archivo:\n{e}")
+            return
+        theme.informar(self, "Listado generado", f"El listado se guardó en:\n{ruta}")

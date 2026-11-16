@@ -64,6 +64,7 @@ ESTILO_APP = f"""
         background-color: #ffffff; alternate-background-color: #eef3f9;
         border: 1px solid #d5dde8; gridline-color: #e3e9f1;
     }}
+    QTableWidget::item:selected {{ background-color: #cfe3f7; color: {TEXTO}; }}
     QHeaderView::section {{
         background-color: {AZUL}; color: #ffffff; font-weight: bold;
         padding: 6px; border: none;
@@ -71,6 +72,23 @@ ESTILO_APP = f"""
     QFrame#tarjeta {{
         background-color: #ffffff; border: 1px solid #d5dde8; border-radius: 8px;
     }}
+    QCalendarWidget QWidget {{ background-color: #ffffff; color: {TEXTO}; }}
+    QCalendarWidget QWidget#qt_calendar_navigationbar {{ background-color: {AZUL}; }}
+    QCalendarWidget QToolButton {{
+        background-color: {AZUL}; color: #ffffff; font-weight: bold;
+        border: none; padding: 4px 8px;
+    }}
+    QCalendarWidget QToolButton:hover {{ background-color: {AZUL_CLARO}; }}
+    QCalendarWidget QToolButton::menu-indicator {{ image: none; }}
+    QCalendarWidget QSpinBox {{ background-color: #ffffff; color: {TEXTO}; }}
+    QCalendarWidget QMenu {{ background-color: #ffffff; color: {TEXTO}; }}
+    QCalendarWidget QMenu::item:selected {{ background-color: {AZUL_CLARO}; color: #ffffff; }}
+    QCalendarWidget QAbstractItemView {{
+        background-color: #ffffff; alternate-background-color: #eef3f9;
+        color: {TEXTO}; outline: none;
+        selection-background-color: {AZUL_CLARO}; selection-color: #ffffff;
+    }}
+    QCalendarWidget QAbstractItemView:disabled {{ color: #b3bcc8; }}
     QMessageBox, QDialog {{ background-color: #ffffff; }}
     QMessageBox QPushButton {{ min-width: 80px; }}
 """
@@ -107,13 +125,25 @@ def boton(texto, rol=None, al_hacer_clic=None):
     return widget
 
 
+class TablaSeleccionable(QTableWidget):
+    """Tabla en la que un clic en la fila ya elegida, o fuera de las filas, la deselecciona."""
+
+    def mousePressEvent(self, event):
+        item = self.itemAt(event.position().toPoint())
+        if item is None or item.isSelected():
+            self.clearSelection()
+            return
+        super().mousePressEvent(event)
+
+
 def crear_tabla(columnas):
-    tabla = QTableWidget(0, len(columnas))
+    tabla = TablaSeleccionable(0, len(columnas))
     tabla.setHorizontalHeaderLabels(columnas)
     tabla.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
     tabla.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     tabla.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
     tabla.setAlternatingRowColors(True)
+    tabla.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     tabla.verticalHeader().setVisible(False)
     tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     return tabla
@@ -121,6 +151,7 @@ def crear_tabla(columnas):
 
 def llenar_tabla(tabla, filas, ids=None):
     """filas: lista de listas de texto. ids: valor asociado a cada fila."""
+    tabla.clearSelection()
     tabla.setRowCount(len(filas))
     for i, fila in enumerate(filas):
         for j, valor in enumerate(fila):
@@ -131,10 +162,10 @@ def llenar_tabla(tabla, filas, ids=None):
 
 
 def id_seleccionado(tabla):
-    fila = tabla.currentRow()
-    if fila < 0:
+    filas = tabla.selectionModel().selectedRows()
+    if not filas:
         return None
-    return tabla.item(fila, 0).data(Qt.ItemDataRole.UserRole)
+    return tabla.item(filas[0].row(), 0).data(Qt.ItemDataRole.UserRole)
 
 
 def combo(opciones):

@@ -1,11 +1,12 @@
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import QRegularExpression, Qt
+from PySide6.QtGui import QImage, QPixmap, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFileDialog,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -180,7 +181,12 @@ class DocentesView(QWidget):
         self.tabla = theme.crear_tabla(["Docente", "CUIL", "Estado"])
         self.tabla.itemSelectionChanged.connect(self._cargar_seleccionado)
         izquierda.addWidget(self.tabla)
-        izquierda.addWidget(theme.boton("Nuevo docente", al_hacer_clic=self._nuevo))
+        fila = QHBoxLayout()
+        fila.addWidget(theme.boton("Nuevo docente", al_hacer_clic=self._nuevo))
+        self.btn_eliminar = theme.boton("Eliminar docente", "peligro", self._eliminar)
+        self.btn_eliminar.setEnabled(False)
+        fila.addWidget(self.btn_eliminar)
+        izquierda.addLayout(fila)
         layout.addLayout(izquierda, 5)
 
         # Formulario
@@ -205,6 +211,16 @@ class DocentesView(QWidget):
         self.input_cuil = QLineEdit()
         self.input_celular = QLineEdit()
         self.input_correo = QLineEdit()
+        # DNI, CUIL y celular sólo aceptan dígitos: no se pueden tipear letras ni símbolos
+        for campo, maximo in (
+            (self.input_dni, 8), (self.input_cuil, 11), (self.input_celular, 15),
+        ):
+            campo.setValidator(
+                QRegularExpressionValidator(QRegularExpression(f"[0-9]{{0,{maximo}}}"), campo)
+            )
+        self.input_dni.setPlaceholderText("Sólo números, 7 u 8 dígitos")
+        self.input_cuil.setPlaceholderText("Sólo números, 11 dígitos (sin guiones)")
+        self.input_celular.setPlaceholderText("Sólo números")
         self.chk_activo = QCheckBox("Activo (puede marcar asistencia)")
         self.chk_activo.setChecked(True)
         form.addRow("Apellido:", self.input_apellido)
@@ -218,8 +234,13 @@ class DocentesView(QWidget):
 
         derecha.addWidget(theme.etiqueta("Fotos para el reconocimiento facial", "seccion"))
         self.secciones = [PhotoSectionWidget(titulo, clave) for titulo, clave in ANGULOS]
-        for seccion in self.secciones:
-            derecha.addWidget(seccion)
+        # Frontal arriba; izquierdo y derecho lado a lado
+        grilla = QGridLayout()
+        grilla.setHorizontalSpacing(20)
+        for seccion, (fila, columna) in zip(self.secciones, ((0, 0), (1, 0), (1, 1))):
+            grilla.addWidget(seccion, fila, columna)
+        grilla.setColumnStretch(2, 1)
+        derecha.addLayout(grilla)
 
         self.btn_guardar = theme.boton("Guardar docente", "confirmar", self._guardar)
         derecha.addWidget(self.btn_guardar)
@@ -248,6 +269,7 @@ class DocentesView(QWidget):
 
     def _nuevo(self):
         self.docente_id = None
+        self.btn_eliminar.setEnabled(False)
         self.tabla.clearSelection()
         self.lbl_formulario.setText("Nuevo docente")
         for campo in (
@@ -262,9 +284,12 @@ class DocentesView(QWidget):
     def _cargar_seleccionado(self):
         docente_id = theme.id_seleccionado(self.tabla)
         if docente_id is None:
+            # Se deseleccionó la fila: el formulario vuelve a "Nuevo docente"
+            self._nuevo()
             return
         docente = self.docentes[docente_id]
         self.docente_id = docente_id
+        self.btn_eliminar.setEnabled(True)
         self.lbl_formulario.setText(f"Editar docente: {theme.nombre_docente(docente)}")
         self.input_apellido.setText(docente["apellido"])
         self.input_nombre.setText(docente["nombre"])
@@ -293,8 +318,15 @@ class DocentesView(QWidget):
                 self, "Campos incompletos", "Apellido, nombre, DNI y CUIL son obligatorios."
             )
             return
-        if not dni.isdigit() or not cuil.replace("-", "").isdigit():
-            theme.avisar(self, "Datos inválidos", "El DNI y el CUIL sólo llevan números.")
+        celular = self.input_celular.text().strip()
+        if not (dni.isdigit() and len(dni) in (7, 8)):
+            theme.avisar(self, "DNI inválido", "El DNI lleva 7 u 8 números, sin puntos.")
+            return
+        if not (cuil.isdigit() and len(cuil) == 11):
+            theme.avisar(self, "CUIL inválido", "El CUIL lleva 11 números, sin guiones.")
+            return
+        if celular and not celular.isdigit():
+            theme.avisar(self, "Celular inválido", "El celular sólo lleva números.")
             return
 
         # Sólo se envían las fotos nuevas; al editar, las demás se conservan
@@ -309,7 +341,7 @@ class DocentesView(QWidget):
 
         datos = (
             apellido, nombre, dni, cuil,
-            self.input_celular.text().strip() or None,
+            celular or None,
             self.input_correo.text().strip() or None,
             self.chk_activo.isChecked(),
         )
@@ -324,5 +356,43 @@ class DocentesView(QWidget):
                 theme.error_bd(self, e)
             return
         theme.informar(self, "Docente guardado", "Los datos del docente fueron guardados.")
+        self.refrescar()
+        self._nuevo()
+
+    def _eliminar(self):
+        if self.docente_id is None:
+            return
+        docente = self.docentes[self.docente_id]
+        try:
+            asociados = docente_repository.contar_registros_asociados(self.docente_id)
+        except Exception as e:
+            theme.error_bd(self, e)
+            return
+        detalle = ", ".join(
+            f"{cantidad} {nombre}"
+            for nombre, cantidad in (
+                ("horario(s)", asociados["horarios"]),
+                ("participación(es) en actividades", asociados["actividades"]),
+                ("marcación(es) de asistencia", asociados["asistencias"]),
+                ("ausencia(s)", asociados["ausencias"]),
+            )
+            if cantidad
+        )
+        texto = (
+            f"¿Eliminar definitivamente a {theme.nombre_docente(docente)}?\n\n"
+            "Se borran sus datos y sus fotos"
+            + (f", y también: {detalle}" if detalle else "")
+            + ".\nEsta acción no se puede deshacer.\n\n"
+            "Si sólo querés que deje de marcar asistencia pero conservar su historial "
+            "para los informes, desmarcá la casilla \"Activo\" y guardá."
+        )
+        if not theme.confirmar(self, "Eliminar docente", texto):
+            return
+        try:
+            docente_repository.eliminar_docente(self.docente_id)
+        except Exception as e:
+            theme.error_bd(self, e)
+            return
+        theme.informar(self, "Docente eliminado", "El docente fue eliminado.")
         self.refrescar()
         self._nuevo()

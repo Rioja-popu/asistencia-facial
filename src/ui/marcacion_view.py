@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 
-from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtCore import QEvent, QRect, Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget
 
@@ -38,6 +38,38 @@ def texto_confirmacion(nombre, propuesta, ahora, tiene_ausencia):
     return "\n".join(lineas)
 
 
+class ContenedorVideo(QWidget):
+    """Mantiene el panel de video centrado y con la proporción de la cámara,
+    para que la imagen lo ocupe entero y no sobren bordes a los costados."""
+
+    def __init__(self, panel):
+        super().__init__()
+        self.panel = panel
+        self.proporcion = 4 / 3
+        panel.setParent(self)
+        self.setMinimumHeight(300)
+
+    def fijar_proporcion(self, ancho, alto):
+        proporcion = ancho / alto
+        if abs(proporcion - self.proporcion) > 0.01:
+            self.proporcion = proporcion
+            self._acomodar()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._acomodar()
+
+    def _acomodar(self):
+        alto = self.height()
+        ancho = round(alto * self.proporcion)
+        if ancho > self.width():
+            ancho = self.width()
+            alto = round(ancho / self.proporcion)
+        self.panel.setGeometry(
+            QRect((self.width() - ancho) // 2, (self.height() - alto) // 2, ancho, alto)
+        )
+
+
 class MarcacionView(QWidget):
     """Marcación de entrada y salida de docentes por reconocimiento facial."""
 
@@ -50,7 +82,6 @@ class MarcacionView(QWidget):
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(30, 20, 30, 20)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(theme.etiqueta("Marcación de asistencia docente"))
         main_layout.addWidget(
             theme.etiqueta(
@@ -74,17 +105,15 @@ class MarcacionView(QWidget):
         self.video_panel.setStyleSheet(
             f"""
             QLabel {{
-                border: 2px dashed #c5ced9;
-                border-radius: 8px;
+                border: 1px solid #c5ced9;
                 background-color: #ffffff;
                 color: {theme.GRIS};
                 font-size: 16px;
                 font-weight: bold;
-                margin-top: 15px;
             }}
         """
         )
-        self.video_panel.setMinimumHeight(400)
+        self.contenedor_video = ContenedorVideo(self.video_panel)
 
         # Cartel superpuesto en la esquina inferior izquierda de la imagen
         self.lbl_overlay = QLabel(self.video_panel)
@@ -117,7 +146,8 @@ class MarcacionView(QWidget):
             f"font-size: 14px; font-weight: bold; color: {theme.AZUL}; margin-top: 10px;"
         )
 
-        main_layout.addWidget(self.video_panel)
+        main_layout.addSpacing(10)
+        main_layout.addWidget(self.contenedor_video, 1)
         main_layout.addWidget(self.lbl_estado)
 
         # Mientras no pase este instante, el resultado de una marcación queda en pantalla
@@ -293,9 +323,10 @@ class MarcacionView(QWidget):
     def _actualizar_frame_panel(self, q_image, raw_frame=None):
         if self.camera_open:
             pixmap = QPixmap.fromImage(q_image)
+            self.contenedor_video.fijar_proporcion(pixmap.width(), pixmap.height())
             scaled_pixmap = pixmap.scaled(
                 self.video_panel.contentsRect().size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
             self.video_panel.setPixmap(scaled_pixmap)

@@ -12,25 +12,31 @@ from PySide6.QtWidgets import (
 from services.camera_service import CameraWorker
 
 
+ANCHO_VIDEO = 640
+
+
 class CameraCaptureDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Tomar foto del docente")
-        self.setFixedSize(640, 520)
 
         self.captured_frame_bytes = None  # Almacenará la foto tomada en bytes
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
 
-        # Panel donde se muestra el video en vivo
+        # Panel del video: tiene exactamente el tamaño de la imagen, sin bordes
         self.video_label = QLabel("Iniciando cámara...")
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.video_label.setStyleSheet("background-color: #000; color: #fff;")
+        self.video_label.setFixedSize(ANCHO_VIDEO, ANCHO_VIDEO * 3 // 4)
         layout.addWidget(self.video_label)
 
         # Botones
         btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(10, 10, 10, 10)
         self.btn_capturar = QPushButton("📸 Capturar Fotografía")
         self.btn_capturar.setStyleSheet(
             "background-color: #27ae60; color: white; font-weight: bold; padding: 10px;"
@@ -57,13 +63,13 @@ class CameraCaptureDialog(QDialog):
 
     def _update_frame(self, image: QImage, raw_frame):
         self.last_raw_frame = raw_frame
-        pixmap = QPixmap.fromImage(image)
-        scaled_pixmap = pixmap.scaled(
-            self.video_label.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+        pixmap = QPixmap.fromImage(image).scaledToWidth(
+            ANCHO_VIDEO, Qt.TransformationMode.SmoothTransformation
         )
-        self.video_label.setPixmap(scaled_pixmap)
+        # El panel toma la proporción real de la cámara, así no sobran bordes
+        if self.video_label.size() != pixmap.size():
+            self.video_label.setFixedSize(pixmap.size())
+        self.video_label.setPixmap(pixmap)
 
     def _capturar(self):
         if self.last_raw_frame is not None:
