@@ -24,3 +24,6 @@ backups/
 # Excepción: imágenes propias de la aplicación (escudo del instituto)
 !assets/*.png
 !assets/iconos/*.png
+
+# Registro del lanzador
+*.log

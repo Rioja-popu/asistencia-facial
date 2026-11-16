@@ -58,6 +58,12 @@ que las dos versiones pueden convivir en la misma computadora.
 
    Usuario de demostración: `admin` / `admin`.
 
+6. Opcional, en Windows: doble clic en `crear_acceso_directo.bat` para tener el
+   acceso directo **Asistencia Docente IES 7** en el escritorio. Abre la
+   aplicación sin consola y, si la base no está levantada, la inicia antes (abre
+   Docker Desktop si está cerrado). Si algo falla al abrir, el detalle queda en
+   `iniciar.log`. Si se mueve la carpeta del proyecto hay que volver a crearlo.
+
 Para volver a crear la base desde cero **de esta rama** (no afecta a la del
 sistema original, que pertenece a otro stack): `docker compose down -v` y
 `docker compose up -d`.
