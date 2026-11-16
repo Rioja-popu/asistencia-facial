@@ -20,3 +20,6 @@ backups/
 # Informes exportados
 *.xlsx
 *.pdf
+
+# Excepción: imágenes propias de la aplicación (escudo del instituto)
+!assets/*.png

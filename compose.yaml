@@ -1,4 +1,4 @@
-name: asistencia-facial
+name: asistencia-docentes
 
 services:
   db:
