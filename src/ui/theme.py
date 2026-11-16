@@ -33,6 +33,11 @@ RUTA_ESCUDO = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "escudo.png"
 )
 
+# Qt necesita las rutas de la hoja de estilo con barras "/"
+_ICONOS = os.path.normpath(os.path.join(os.path.dirname(RUTA_ESCUDO), "iconos")).replace(
+    os.sep, "/"
+)
+
 DIAS_SEMANA = {
     1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves",
     5: "Viernes", 6: "Sábado", 7: "Domingo",
@@ -47,10 +52,63 @@ ESTILO_APP = f"""
         padding: 5px; border: 1px solid #c5ced9; border-radius: 4px;
         background-color: #ffffff; color: {TEXTO};
     }}
+    QLineEdit:focus, QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus, QComboBox:focus {{
+        border: 1px solid {AZUL_CLARO};
+    }}
+    /* Lista desplegable con barra de desplazamiento en lugar del menú nativo */
+    QComboBox {{ combobox-popup: 0; padding-right: 30px; }}
+    QDateEdit {{ padding-right: 30px; }}
     QComboBox QAbstractItemView {{
-        background-color: #ffffff; color: {TEXTO};
+        background-color: #ffffff; color: {TEXTO}; outline: none;
+        border: 1px solid {AZUL_CLARO};
         selection-background-color: {AZUL_CLARO}; selection-color: #ffffff;
     }}
+    QComboBox QAbstractItemView::item {{ min-height: 26px; padding-left: 6px; }}
+    QComboBox::drop-down, QDateEdit::drop-down {{
+        subcontrol-origin: border; subcontrol-position: center right;
+        width: 28px; border: none; background-color: {AZUL_CLARO};
+        border-top-right-radius: 4px; border-bottom-right-radius: 4px;
+    }}
+    QComboBox::drop-down:hover, QDateEdit::drop-down:hover {{ background-color: {AZUL}; }}
+    QComboBox::drop-down:disabled, QDateEdit::drop-down:disabled {{ background-color: #c5ced9; }}
+    QComboBox::down-arrow, QDateEdit::down-arrow {{
+        image: url({_ICONOS}/flecha_abajo.png); width: 14px; height: 14px;
+    }}
+    QTimeEdit, QSpinBox {{ padding-right: 28px; }}
+    QTimeEdit::up-button, QSpinBox::up-button {{
+        subcontrol-origin: border; subcontrol-position: top right;
+        width: 24px; border: none; background-color: {AZUL_CLARO};
+        border-top-right-radius: 4px;
+    }}
+    QTimeEdit::down-button, QSpinBox::down-button {{
+        subcontrol-origin: border; subcontrol-position: bottom right;
+        width: 24px; border: none; background-color: {AZUL_CLARO};
+        border-top: 1px solid #ffffff; border-bottom-right-radius: 4px;
+    }}
+    QTimeEdit::up-button:hover, QSpinBox::up-button:hover,
+    QTimeEdit::down-button:hover, QSpinBox::down-button:hover {{ background-color: {AZUL}; }}
+    QTimeEdit::up-button:disabled, QSpinBox::up-button:disabled,
+    QTimeEdit::down-button:disabled, QSpinBox::down-button:disabled {{
+        background-color: #c5ced9;
+    }}
+    QTimeEdit::up-arrow, QSpinBox::up-arrow {{
+        image: url({_ICONOS}/flecha_arriba.png); width: 10px; height: 10px;
+    }}
+    QTimeEdit::down-arrow, QSpinBox::down-arrow {{
+        image: url({_ICONOS}/flecha_abajo.png); width: 10px; height: 10px;
+    }}
+    QScrollBar:vertical {{
+        background-color: #e8eef5; width: 12px; margin: 0; border: none;
+    }}
+    QScrollBar:horizontal {{
+        background-color: #e8eef5; height: 12px; margin: 0; border: none;
+    }}
+    QScrollBar::handle {{ background-color: {AZUL_CLARO}; border-radius: 5px; margin: 2px; }}
+    QScrollBar::handle:vertical {{ min-height: 30px; }}
+    QScrollBar::handle:horizontal {{ min-width: 30px; }}
+    QScrollBar::handle:hover {{ background-color: {AZUL}; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; border: none; }}
+    QScrollBar::add-page, QScrollBar::sub-page {{ background: none; }}
     QPushButton {{
         background-color: {AZUL_CLARO}; color: #ffffff; font-weight: bold;
         padding: 7px 14px; border: none; border-radius: 4px;
@@ -80,7 +138,7 @@ ESTILO_APP = f"""
     }}
     QCalendarWidget QToolButton:hover {{ background-color: {AZUL_CLARO}; }}
     QCalendarWidget QToolButton::menu-indicator {{ image: none; }}
-    QCalendarWidget QSpinBox {{ background-color: #ffffff; color: {TEXTO}; }}
+    QCalendarWidget QSpinBox {{ background-color: #ffffff; color: {TEXTO}; padding-right: 22px; }}
     QCalendarWidget QMenu {{ background-color: #ffffff; color: {TEXTO}; }}
     QCalendarWidget QMenu::item:selected {{ background-color: {AZUL_CLARO}; color: #ffffff; }}
     QCalendarWidget QAbstractItemView {{
