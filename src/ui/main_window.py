@@ -54,7 +54,7 @@ class MainWindow(QWidget):
             }}
             QPushButton:hover {{ background-color: {theme.AZUL_CLARO}; }}
             QPushButton:checked {{
-                background-color: {theme.AZUL_CLARO}; font-weight: bold;
+                background-color: #1d4a80; color: {theme.DORADO}; font-weight: bold;
                 border-left: 4px solid {theme.DORADO};
             }}
         """

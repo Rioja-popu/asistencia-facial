@@ -186,7 +186,7 @@ class DocentesView(QWidget):
         self.tabla.itemSelectionChanged.connect(self._cargar_seleccionado)
         izquierda.addWidget(self.tabla)
         fila = QHBoxLayout()
-        fila.addWidget(theme.boton("Nuevo docente", al_hacer_clic=self._nuevo))
+        fila.addWidget(theme.boton("Nuevo docente", "secundario", self._nuevo))
         self.btn_eliminar = theme.boton("Eliminar docente", "peligro", self._eliminar)
         self.btn_eliminar.setEnabled(False)
         fila.addWidget(self.btn_eliminar)

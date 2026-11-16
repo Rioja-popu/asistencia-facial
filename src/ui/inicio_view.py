@@ -47,7 +47,7 @@ class InicioView(QWidget):
         titulos.addWidget(self.lbl_fecha)
         encabezado.addLayout(titulos, 1)
         encabezado.addWidget(
-            theme.boton("Actualizar", al_hacer_clic=self.refrescar),
+            theme.boton("Actualizar", "secundario", self.refrescar),
             alignment=Qt.AlignmentFlag.AlignBottom,
         )
         layout.addLayout(encabezado)

@@ -125,7 +125,7 @@ class ConfirmarMarcacionDialog(QDialog):
         layout.addWidget(QLabel("¿Confirmás la marcación?"))
         botones = QHBoxLayout()
         botones.addStretch()
-        self.btn_cancelar = theme.boton("Cancelar", "peligro", self.reject)
+        self.btn_cancelar = theme.boton("Cancelar", "neutro", self.reject)
         self.btn_ok = theme.boton("OK", "confirmar", self.accept)
         for boton in (self.btn_cancelar, self.btn_ok):
             boton.setMinimumWidth(110)

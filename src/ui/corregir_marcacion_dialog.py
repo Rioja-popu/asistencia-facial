@@ -62,7 +62,7 @@ class CorregirMarcacionDialog(QDialog):
         botones = QHBoxLayout()
         botones.addStretch()
         botones.addWidget(theme.boton("Guardar", "confirmar", self._guardar))
-        botones.addWidget(theme.boton("Cancelar", "peligro", self.reject))
+        botones.addWidget(theme.boton("Cancelar", "neutro", self.reject))
         layout.addLayout(botones)
 
     @staticmethod

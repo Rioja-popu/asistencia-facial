@@ -38,13 +38,8 @@ class CameraCaptureDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(10, 10, 10, 10)
         self.btn_capturar = QPushButton("📸 Capturar Fotografía")
-        self.btn_capturar.setStyleSheet(
-            "background-color: #27ae60; color: white; font-weight: bold; padding: 10px;"
-        )
         self.btn_cancelar = QPushButton("Cancelar")
-        self.btn_cancelar.setStyleSheet(
-            "background-color: #e74c3c; color: white; padding: 10px;"
-        )
+        self.btn_cancelar.setProperty("rol", "neutro")
 
         btn_layout.addWidget(self.btn_capturar)
         btn_layout.addWidget(self.btn_cancelar)

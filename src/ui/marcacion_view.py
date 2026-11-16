@@ -68,7 +68,7 @@ class MarcacionView(QWidget):
 
         btn_layout = QHBoxLayout()
         self.btn_abrir = theme.boton("Abrir cámara", "confirmar", self._abrir_camara)
-        self.btn_cerrar = theme.boton("Cerrar cámara", "peligro", self._cerrar_camara)
+        self.btn_cerrar = theme.boton("Cerrar cámara", "secundario", self._cerrar_camara)
         self.btn_cerrar.setEnabled(False)
         btn_layout.addWidget(self.btn_abrir)
         btn_layout.addWidget(self.btn_cerrar)

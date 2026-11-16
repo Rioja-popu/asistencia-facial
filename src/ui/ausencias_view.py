@@ -75,7 +75,7 @@ class AusenciasView(QWidget):
 
         fila = QHBoxLayout()
         fila.addWidget(
-            theme.boton("Certificado presentado", "confirmar", lambda: self._resolver(True))
+            theme.boton("Certificado presentado", "secundario", lambda: self._resolver(True))
         )
         fila.addWidget(
             theme.boton("No presentó certificado", "secundario", lambda: self._resolver(False))

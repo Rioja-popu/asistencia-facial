@@ -76,9 +76,9 @@ class InformesView(QWidget):
 
         fila = QHBoxLayout()
         self.btn_excel = theme.boton(
-            "Exportar a Excel", "confirmar", lambda: self._exportar("xlsx")
+            "Exportar a Excel", "secundario", lambda: self._exportar("xlsx")
         )
-        self.btn_pdf = theme.boton("Exportar a PDF", "peligro", lambda: self._exportar("pdf"))
+        self.btn_pdf = theme.boton("Exportar a PDF", "secundario", lambda: self._exportar("pdf"))
         fila.addWidget(self.btn_excel)
         fila.addWidget(self.btn_pdf)
         fila.addStretch()

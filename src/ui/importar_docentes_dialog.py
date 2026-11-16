@@ -27,7 +27,7 @@ class ImportarDocentesDialog(QDialog):
         fila.addStretch()
         self.btn_importar = theme.boton("Importar", "confirmar", self._importar)
         fila.addWidget(self.btn_importar)
-        fila.addWidget(theme.boton("Cancelar", "peligro", self.reject))
+        fila.addWidget(theme.boton("Cancelar", "neutro", self.reject))
         layout.addLayout(fila)
 
         self.plan = importacion_docentes_service.planificar(

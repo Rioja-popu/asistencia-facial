@@ -3,7 +3,7 @@
 import os
 
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -59,7 +59,11 @@ DIAS_SEMANA = {
 
 ESTILO_APP = f"""
     QWidget {{ color: {TEXTO}; font-size: 13px; }}
-    QLabel#titulo {{ font-size: 20px; font-weight: bold; color: {AZUL}; }}
+    QLabel#titulo {{
+        font-size: 20px; font-weight: bold; color: {AZUL};
+        border: none; border-bottom: 3px solid {DORADO}; padding: 0 0 5px 0;
+        margin-bottom: 4px; qproperty-indent: 0;
+    }}
     QLabel#subtitulo {{ font-size: 13px; color: {GRIS}; }}
     QLabel#seccion {{ font-size: 14px; font-weight: bold; color: {AZUL}; }}
     QLineEdit, QDateEdit, QTimeEdit, QSpinBox, QComboBox {{
@@ -128,10 +132,19 @@ ESTILO_APP = f"""
         padding: 7px 14px; border: none; border-radius: 4px;
     }}
     QPushButton:hover {{ background-color: {AZUL}; }}
-    QPushButton:disabled {{ background-color: #c5ced9; color: #7b8794; }}
-    QPushButton[rol="confirmar"] {{ background-color: {VERDE}; }}
     QPushButton[rol="peligro"] {{ background-color: {ROJO}; }}
-    QPushButton[rol="secundario"] {{ background-color: {TURQUESA}; }}
+    QPushButton[rol="peligro"]:hover {{ background-color: #96281b; }}
+    QPushButton[rol="secundario"], QPushButton[rol="neutro"] {{
+        background-color: #ffffff; padding: 6px 13px;
+    }}
+    QPushButton[rol="secundario"] {{ color: {AZUL_CLARO}; border: 1px solid {AZUL_CLARO}; }}
+    QPushButton[rol="secundario"]:hover {{ background-color: #e3eefa; }}
+    QPushButton[rol="neutro"] {{ color: #56616e; border: 1px solid #b8c2cf; }}
+    QPushButton[rol="neutro"]:hover {{ background-color: #eef1f5; }}
+    QPushButton:disabled, QPushButton[rol]:disabled {{
+        background-color: #e4e9ef; color: #9aa5b1; border: 1px solid #d5dde8;
+        padding: 6px 13px;
+    }}
     QTableWidget {{
         background-color: #ffffff; alternate-background-color: #eef3f9;
         border: 1px solid #d5dde8; gridline-color: #e3e9f1;
@@ -166,17 +179,37 @@ ESTILO_APP = f"""
 """
 
 
+# El archivo trae el escudo en un círculo blanco sobre un cuadrado turquesa:
+# margen de ese cuadrado a cada lado (fracción del ancho) y diámetro del círculo
+_MARGEN_ESCUDO = (0.08, 0.09)
+_DIAMETRO_ESCUDO = 0.823
+
+
 def escudo(tamano):
+    """El escudo recortado al círculo blanco, sin el recuadro turquesa."""
     etiqueta = QLabel()
-    pixmap = QPixmap(RUTA_ESCUDO)
-    if not pixmap.isNull():
-        etiqueta.setPixmap(
-            pixmap.scaled(
-                tamano, tamano,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
+    original = QPixmap(RUTA_ESCUDO)
+    if not original.isNull():
+        lado = round(original.width() * _DIAMETRO_ESCUDO)
+        recorte = original.copy(
+            round(original.width() * _MARGEN_ESCUDO[0]),
+            round(original.height() * _MARGEN_ESCUDO[1]),
+            lado, lado,
+        ).scaled(
+            tamano, tamano,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
         )
+        pixmap = QPixmap(tamano, tamano)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        contorno = QPainterPath()
+        contorno.addEllipse(QRectF(1, 1, tamano - 2, tamano - 2))
+        painter.setClipPath(contorno)
+        painter.drawPixmap(0, 0, recorte)
+        painter.end()
+        etiqueta.setPixmap(pixmap)
     etiqueta.setAlignment(Qt.AlignmentFlag.AlignCenter)
     return etiqueta
 

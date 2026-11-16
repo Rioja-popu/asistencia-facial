@@ -1,6 +1,14 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QLabel, QLineEdit, QMessageBox, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from repositories.user_repository import UserRepository
 from ui import theme
@@ -14,10 +22,22 @@ class LoginWindow(QWidget):
 
         self.setWindowTitle(f"{theme.SISTEMA} - Inicio de sesión")
         self.setWindowIcon(QIcon(theme.RUTA_ESCUDO))
-        self.resize(420, 480)
+        self.resize(780, 460)
         self.setObjectName("login")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet(f"QWidget#login {{ background-color: {theme.FONDO}; }}")
+        self.setStyleSheet(
+            f"""
+            QWidget#login {{ background-color: #ffffff; }}
+            QWidget#identidad {{ background-color: {theme.AZUL}; }}
+            QWidget#identidad QLabel {{ background: transparent; color: #ffffff; }}
+            QLabel#institucion {{ font-size: 19px; font-weight: bold; }}
+            QLabel#sistema {{ font-size: 14px; color: {theme.DORADO}; }}
+            QFrame#acento {{ background-color: {theme.DORADO}; border: none; }}
+            QLabel#bienvenida {{ font-size: 22px; font-weight: bold; color: {theme.AZUL}; }}
+            QLineEdit {{ padding: 9px 10px; }}
+            QPushButton {{ padding: 10px 14px; font-size: 14px; }}
+            """
+        )
 
         self.identifier_input = QLineEdit()
         self.identifier_input.setPlaceholderText("Usuario / Email / DNI / CUIL")
@@ -29,21 +49,48 @@ class LoginWindow(QWidget):
 
         self.login_button = theme.boton("Iniciar sesión", al_hacer_clic=self.iniciar_sesion)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(50, 30, 50, 30)
-        layout.setSpacing(12)
-        layout.addWidget(theme.escudo(150))
-        for texto, nombre in ((theme.INSTITUCION, "titulo"), (theme.SISTEMA, "subtitulo")):
+        identidad = QWidget()
+        identidad.setObjectName("identidad")
+        identidad.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        izquierda = QVBoxLayout(identidad)
+        izquierda.setContentsMargins(30, 30, 30, 30)
+        izquierda.setSpacing(10)
+        izquierda.addStretch()
+        izquierda.addWidget(theme.escudo(170))
+        izquierda.addSpacing(8)
+        for texto, nombre in ((theme.INSTITUCION, "institucion"), (theme.SISTEMA, "sistema")):
             lbl = QLabel(texto)
             lbl.setObjectName(nombre)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setWordWrap(True)
-            layout.addWidget(lbl)
-        layout.addSpacing(10)
-        layout.addWidget(self.identifier_input)
-        layout.addWidget(self.password_input)
-        layout.addWidget(self.login_button)
-        layout.addStretch()
+            izquierda.addWidget(lbl)
+            if nombre == "institucion":
+                acento = QFrame()
+                acento.setObjectName("acento")
+                acento.setFixedSize(60, 3)
+                izquierda.addWidget(acento, alignment=Qt.AlignmentFlag.AlignHCenter)
+        izquierda.addStretch()
+
+        formulario = QVBoxLayout()
+        formulario.setContentsMargins(45, 30, 45, 30)
+        formulario.setSpacing(12)
+        formulario.addStretch()
+        formulario.addWidget(theme.etiqueta("Iniciar sesión", "bienvenida"))
+        formulario.addWidget(
+            theme.etiqueta("Ingresá con tu usuario del personal administrativo.", "subtitulo")
+        )
+        formulario.addSpacing(10)
+        formulario.addWidget(self.identifier_input)
+        formulario.addWidget(self.password_input)
+        formulario.addSpacing(4)
+        formulario.addWidget(self.login_button)
+        formulario.addStretch()
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(identidad, 1)
+        layout.addLayout(formulario, 1)
 
     def iniciar_sesion(self):
         identificador = self.identifier_input.text().strip()
