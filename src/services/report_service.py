@@ -1,73 +1,72 @@
-import re
-import unicodedata
+"""Informe de asistencia de un docente en un período, en Excel y PDF.
+
+Recibe las filas ya clasificadas por situacion_service; no accede a la base.
+"""
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-TITULO = "PLANILLA DE ASISTENCIA"
-COLUMNAS = ["#", "Apellido", "Nombre", "DNI", "Libreta", "Entrada", "Salida"]
-SIN_REGISTRAR = "Sin registrar"
-MENSAJE_SIN_ASISTENCIAS = "No se registraron asistencias para esta Jornada."
+from services import situacion_service
 
-
-def formatear_hora(valor):
-    return valor.strftime("%H:%M") if valor is not None else SIN_REGISTRAR
-
-
-def texto_contador(cantidad):
-    if cantidad == 1:
-        return "Se registró 1 alumno presente en total."
-    return f"Se registraron {cantidad} alumnos presentes en total."
+INSTITUCION = "IES N.º 7 Populorum Progressio"
+TITULO = "Informe de asistencia docente"
+COLUMNAS = ["Fecha", "Día", "Obligación", "Horario previsto", "Entrada", "Salida", "Situación"]
+MENSAJE_SIN_OBLIGACIONES = "El docente no tiene obligaciones en el período seleccionado."
+AZUL = "143560"
+DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
 
-def nombre_sugerido(jornada, extension):
-    """Ej.: asistencia_2026-10-08_reconocimiento-visual.xlsx"""
-    sin_acentos = (
-        unicodedata.normalize("NFKD", jornada["catedra"] or "")
-        .encode("ascii", "ignore")
-        .decode("ascii")
-    )
-    catedra = re.sub(r"[^a-z0-9]+", "-", sin_acentos.lower()).strip("-")
-    partes = ["asistencia", jornada["fecha"].isoformat()]
-    if catedra:
-        partes.append(catedra)
-    return "_".join(partes) + "." + extension
+def formatear_fecha(fecha):
+    return fecha.strftime("%d/%m/%Y")
 
 
-def datos_jornada(jornada):
-    return [
-        ("Fecha:", jornada["fecha"].strftime("%d/%m/%Y")),
-        ("Cátedra:", jornada["catedra"]),
-        ("Horario de entrada:", jornada["horario_entrada"].strftime("%H:%M")),
-        ("Horario de salida:", jornada["horario_salida"].strftime("%H:%M")),
-        ("Usuario:", jornada["nombre_usuario"]),
+def formatear_hora(momento):
+    return momento.strftime("%H:%M") if momento else "-"
+
+
+def nombre_archivo_sugerido(docente, desde, hasta, extension):
+    apellido = "".join(c if c.isalnum() else "_" for c in docente["apellido"])
+    return f"asistencia_{apellido}_{desde:%Y-%m-%d}_a_{hasta:%Y-%m-%d}.{extension}"
+
+
+def datos_encabezado(docente, desde, hasta, usuario, particulares):
+    """particulares: [(año, usados, límite), ...]"""
+    datos = [
+        ("Docente:", f"{docente['apellido']}, {docente['nombre']}"),
+        ("DNI / CUIL:", f"{docente['dni']} / {docente['cuil']}"),
+        ("Período:", f"{formatear_fecha(desde)} al {formatear_fecha(hasta)}"),
     ]
+    for anio, usados, limite in particulares:
+        datos.append((f"Particulares {anio}:", f"{usados} de {limite} utilizados"))
+    datos.append(("Informe generado por:", usuario))
+    return datos
 
 
-def filas_alumnos(asistencias):
-    """asistencias = [(apellido, nombre, dni, libreta, entrada, salida), ...]"""
+def filas_informe(filas):
     return [
         [
-            indice,
-            apellido,
-            nombre,
-            dni,
-            libreta,
-            formatear_hora(entrada),
-            formatear_hora(salida),
+            formatear_fecha(f["fecha"]),
+            DIAS[f["fecha"].weekday()],
+            f["descripcion"],
+            f"{formatear_hora(f['inicio'])} - {formatear_hora(f['fin'])}",
+            formatear_hora(f["entrada"]),
+            formatear_hora(f["salida"]),
+            f["situacion"],
         ]
-        for indice, (apellido, nombre, dni, libreta, entrada, salida) in enumerate(
-            asistencias, start=1
-        )
+        for f in filas
     ]
 
 
-def generar_excel(ruta, jornada, asistencias):
+def filas_totales(filas):
+    return [("Obligaciones en el período", len(filas))] + situacion_service.totales(filas)
+
+
+def generar_excel(ruta, encabezado, filas):
     wb = Workbook()
     ws = wb.active
     ws.title = "Asistencia"
@@ -75,126 +74,143 @@ def generar_excel(ruta, jornada, asistencias):
     negrita = Font(bold=True)
     borde = Border(*(Side(style="thin", color="999999"),) * 4)
     centrado = Alignment(horizontal="center")
-    ultima_columna = len(COLUMNAS)
+    ultima = len(COLUMNAS)
 
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ultima_columna)
-    ws["A1"] = TITULO
-    ws["A1"].font = Font(bold=True, size=14)
-    ws["A1"].alignment = centrado
+    for fila, texto, tamano in ((1, INSTITUCION, 14), (2, TITULO, 12)):
+        ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=ultima)
+        celda = ws.cell(row=fila, column=1, value=texto)
+        celda.font = Font(bold=True, size=tamano, color=AZUL)
+        celda.alignment = centrado
 
-    fila = 3
-    for etiqueta, valor in datos_jornada(jornada):
+    fila = 4
+    for etiqueta, valor in encabezado:
         ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=2)
-        ws.merge_cells(
-            start_row=fila, start_column=3, end_row=fila, end_column=ultima_columna
-        )
+        ws.merge_cells(start_row=fila, start_column=3, end_row=fila, end_column=ultima)
         ws.cell(row=fila, column=1, value=etiqueta).font = negrita
         ws.cell(row=fila, column=3, value=valor)
         fila += 1
 
     fila += 1
-    filas = filas_alumnos(asistencias)
-    if filas:
+    detalle = filas_informe(filas)
+    if detalle:
         for columna, titulo in enumerate(COLUMNAS, start=1):
             celda = ws.cell(row=fila, column=columna, value=titulo)
             celda.font = Font(bold=True, color="FFFFFF")
-            celda.fill = PatternFill("solid", fgColor="2C3E50")
+            celda.fill = PatternFill("solid", fgColor=AZUL)
             celda.alignment = centrado
             celda.border = borde
         fila += 1
-        for datos in filas:
+        for datos in detalle:
             for columna, valor in enumerate(datos, start=1):
                 celda = ws.cell(row=fila, column=columna, value=valor)
                 celda.border = borde
-                if columna in (1, 6, 7):
+                if columna in (1, 4, 5, 6):
                     celda.alignment = centrado
             fila += 1
     else:
-        ws.merge_cells(
-            start_row=fila, start_column=1, end_row=fila, end_column=ultima_columna
-        )
-        ws.cell(row=fila, column=1, value=MENSAJE_SIN_ASISTENCIAS)
+        ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=ultima)
+        ws.cell(row=fila, column=1, value=MENSAJE_SIN_OBLIGACIONES)
         fila += 1
 
     fila += 1
-    ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=ultima_columna)
-    ws.cell(row=fila, column=1, value=texto_contador(len(filas))).font = negrita
+    ws.cell(row=fila, column=1, value="Resumen").font = negrita
+    fila += 1
+    for nombre, cantidad in filas_totales(filas):
+        ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=3)
+        ws.cell(row=fila, column=1, value=nombre)
+        ws.cell(row=fila, column=4, value=cantidad).alignment = centrado
+        fila += 1
 
-    for letra, ancho in zip("ABCDEFG", (6, 24, 24, 14, 14, 12, 16)):
+    for letra, ancho in zip("ABCDEFG", (12, 12, 48, 17, 10, 10, 48)):
         ws.column_dimensions[letra].width = ancho
 
     wb.save(ruta)
 
 
-def generar_pdf(ruta, jornada, asistencias):
+def generar_pdf(ruta, encabezado, filas, ruta_escudo=None):
     estilos = getSampleStyleSheet()
     normal = estilos["Normal"]
-    celda = ParagraphStyle("celda", parent=normal, fontSize=9, leading=11)
+    celda = ParagraphStyle("celda", parent=normal, fontSize=8, leading=10)
+    azul = colors.HexColor("#" + AZUL)
+    titulo = ParagraphStyle("titulo", parent=estilos["Title"], textColor=azul, fontSize=16)
+    subtitulo = ParagraphStyle(
+        "subtitulo", parent=estilos["Heading2"], textColor=azul, alignment=1
+    )
 
     doc = SimpleDocTemplate(
         ruta,
-        pagesize=A4,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
+        pagesize=landscape(A4),
+        leftMargin=1.5 * cm,
+        rightMargin=1.5 * cm,
+        topMargin=1.5 * cm,
+        bottomMargin=1.5 * cm,
         title=TITULO,
     )
-    elementos = [Paragraph(TITULO, estilos["Title"]), Spacer(1, 0.4 * cm)]
+    elementos = []
+    if ruta_escudo:
+        elementos.append(Image(ruta_escudo, width=2.2 * cm, height=2.2 * cm))
+    elementos += [
+        Paragraph(INSTITUCION, titulo),
+        Paragraph(TITULO, subtitulo),
+        Spacer(1, 0.3 * cm),
+    ]
 
-    tabla_jornada = Table(
-        [[etiqueta, Paragraph(valor, normal)] for etiqueta, valor in datos_jornada(jornada)],
-        colWidths=[4.5 * cm, 12.5 * cm],
+    tabla_encabezado = Table(
+        [[etiqueta, Paragraph(str(valor), normal)] for etiqueta, valor in encabezado],
+        colWidths=[4.5 * cm, 20 * cm],
         hAlign="LEFT",
     )
-    tabla_jornada.setStyle(
+    tabla_encabezado.setStyle(
         TableStyle(
-            [
-                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ]
+            [("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"), ("VALIGN", (0, 0), (-1, -1), "TOP")]
         )
     )
-    elementos += [tabla_jornada, Spacer(1, 0.6 * cm)]
+    elementos += [tabla_encabezado, Spacer(1, 0.5 * cm)]
 
-    filas = filas_alumnos(asistencias)
-    if filas:
+    detalle = filas_informe(filas)
+    if detalle:
         datos = [COLUMNAS] + [
-            [fila[0]] + [Paragraph(str(v), celda) for v in fila[1:5]] + fila[5:]
-            for fila in filas
+            [f[0], f[1], Paragraph(f[2], celda), f[3], f[4], f[5], Paragraph(f[6], celda)]
+            for f in detalle
         ]
         tabla = Table(
             datos,
-            colWidths=[c * cm for c in (1, 4.3, 4.3, 2.4, 2.2, 1.8, 2.6)],
+            colWidths=[c * cm for c in (2.2, 2.2, 8.4, 3, 1.7, 1.7, 7.3)],
             repeatRows=1,
         )
         tabla.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+                    ("BACKGROUND", (0, 0), (-1, 0), azul),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
                     ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-                    ("ALIGN", (0, 1), (0, -1), "CENTER"),
-                    ("ALIGN", (5, 1), (6, -1), "CENTER"),
+                    ("ALIGN", (3, 1), (5, -1), "CENTER"),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#999999")),
-                    (
-                        "ROWBACKGROUNDS",
-                        (0, 1),
-                        (-1, -1),
-                        [colors.white, colors.HexColor("#f2f4f5")],
-                    ),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#eef3f9")]),
                 ]
             )
         )
         elementos.append(tabla)
     else:
-        elementos.append(Paragraph(MENSAJE_SIN_ASISTENCIAS, normal))
+        elementos.append(Paragraph(MENSAJE_SIN_OBLIGACIONES, normal))
 
-    elementos += [
-        Spacer(1, 0.6 * cm),
-        Paragraph(f"<b>{texto_contador(len(filas))}</b>", normal),
-    ]
+    resumen = Table(
+        [["Resumen", ""]] + [[n, str(c)] for n, c in filas_totales(filas)],
+        colWidths=[8 * cm, 2 * cm],
+        hAlign="LEFT",
+    )
+    resumen.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (1, 0), (1, -1), "CENTER"),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.5, azul),
+            ]
+        )
+    )
+    elementos += [Spacer(1, 0.5 * cm), resumen]
     doc.build(elementos)
