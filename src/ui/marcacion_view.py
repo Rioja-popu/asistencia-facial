@@ -45,6 +45,7 @@ class MarcacionView(QWidget):
         super().__init__()
         self.camera_open = False
         self.camera_worker = None
+        self._worker_cerrando = None
         self.facial_service = FacialRecognitionService()
 
         main_layout = QVBoxLayout(self)
@@ -135,32 +136,47 @@ class MarcacionView(QWidget):
                 "No hay docentes activos registrados. Cargalos en la sección Docentes.",
             )
             return
-        self.facial_service.cargar_referencias_desde_db(docentes)
-
         self.camera_open = True
         self.btn_abrir.setEnabled(False)
         self.btn_cerrar.setEnabled(True)
 
-        self.camera_worker = CameraWorker(facial_service=self.facial_service)
+        self.camera_worker = CameraWorker(
+            facial_service=self.facial_service, docentes=docentes
+        )
         self.camera_worker.frame_received.connect(self._actualizar_frame_panel)
         self.camera_worker.status_changed.connect(self._actualizar_texto_estado)
         self.camera_worker.docente_reconocido.connect(self._procesar_reconocimiento)
         self.camera_worker.start()
-        self._mostrar_overlay("Escaneando...")
+        self.video_panel.setText("Preparando la cámara...")
 
     def _cerrar_camara(self):
         self.camera_open = False
         self.overlay_timer.stop()
         self.lbl_overlay.hide()
-        if self.camera_worker and self.camera_worker.isRunning():
-            self.camera_worker.stop()
-        self.camera_worker = None
+        worker, self.camera_worker = self.camera_worker, None
+        if worker and worker.isRunning():
+            # No se espera al hilo: si todavía está cargando el modelo o encendiendo
+            # la cámara, la ventana se congelaría. Se vuelve a habilitar "Abrir
+            # cámara" recién cuando el hilo terminó.
+            self._worker_cerrando = worker
+            worker.finished.connect(self._camara_liberada)
+            worker.pedir_detencion()
         self.video_panel.clear()
         self.video_panel.setText("Cámara apagada")
         self._estado_fijo_hasta = 0.0
         self.lbl_estado.setText("Cámara cerrada.")
-        self.btn_abrir.setEnabled(True)
+        self.btn_abrir.setEnabled(self._worker_cerrando is None)
         self.btn_cerrar.setEnabled(False)
+
+    def esperar_cierre(self):
+        """Al cerrar la aplicación sí hay que esperar a que termine el hilo."""
+        if self._worker_cerrando is not None:
+            self._worker_cerrando.wait()
+
+    def _camara_liberada(self):
+        self._worker_cerrando = None
+        if not self.camera_open:
+            self.btn_abrir.setEnabled(True)
 
     # ------------------------------------------------------------- marcación
     def _procesar_reconocimiento(self, match_data, distancia):
@@ -283,4 +299,7 @@ class MarcacionView(QWidget):
                 Qt.TransformationMode.SmoothTransformation,
             )
             self.video_panel.setPixmap(scaled_pixmap)
+            if self.lbl_overlay.isHidden():
+                # Primera imagen: la cámara ya está lista
+                self._mostrar_overlay("Escaneando...")
             self._ubicar_overlay()

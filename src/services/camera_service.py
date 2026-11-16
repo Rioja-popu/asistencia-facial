@@ -1,3 +1,4 @@
+import sys
 import time
 import cv2
 from PySide6.QtCore import QThread, Signal
@@ -12,10 +13,12 @@ class CameraWorker(QThread):
         dict, float
     )  # Emitir datos del docente y la distancia si pasa el umbral
 
-    def __init__(self, facial_service=None, camera_index=0):
+    def __init__(self, facial_service=None, camera_index=0, docentes=None):
         super().__init__()
         self.camera_index = camera_index
         self.facial_service = facial_service
+        # Docentes con sus fotos: las referencias se calculan en este hilo
+        self.docentes = docentes
         self._is_running = False
 
         # Cargar clasificador de rostros Haar Cascade
@@ -41,7 +44,26 @@ class CameraWorker(QThread):
 
     def run(self):
         self._is_running = True
-        cap = cv2.VideoCapture(self.camera_index)
+
+        # Cargar el modelo y las fotos de referencia tarda: se hace acá y no en la
+        # interfaz, para que la ventana siga respondiendo
+        if self.facial_service and self.docentes is not None:
+            self.status_changed.emit(
+                "Preparando el reconocimiento facial, puede tardar un momento..."
+            )
+            try:
+                self.facial_service.cargar_referencias_desde_db(
+                    self.docentes, continuar=lambda: self._is_running
+                )
+            except Exception as e:
+                self.status_changed.emit(f"Error al preparar el reconocimiento: {e}")
+                self._is_running = False
+                return
+            if not self._is_running:
+                return
+
+        self.status_changed.emit("Encendiendo la cámara...")
+        cap = self._abrir_captura()
 
         if not cap.isOpened():
             self.status_changed.emit("Error: No se pudo abrir la cámara")
@@ -141,6 +163,19 @@ class CameraWorker(QThread):
             self.msleep(30)  # ~30 FPS
 
         cap.release()
+
+    def _abrir_captura(self):
+        # En Windows, DirectShow abre la webcam mucho más rápido que el backend por defecto
+        if sys.platform == "win32":
+            cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                return cap
+            cap.release()
+        return cv2.VideoCapture(self.camera_index)
+
+    def pedir_detencion(self):
+        """Pide al hilo que termine sin esperarlo (no congela la interfaz)."""
+        self._is_running = False
 
     def stop(self):
         self._is_running = False

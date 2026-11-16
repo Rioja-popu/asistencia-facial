@@ -119,4 +119,5 @@ class MainWindow(QWidget):
     def closeEvent(self, event):
         if self.view_marcacion.camera_open:
             self.view_marcacion._cerrar_camara()
+        self.view_marcacion.esperar_cierre()
         super().closeEvent(event)
