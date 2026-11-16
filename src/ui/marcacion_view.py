@@ -27,9 +27,9 @@ def texto_confirmacion(nombre, propuesta, ahora, tiene_ausencia):
             f"• {item['descripcion']} "
             f"({theme.hora(item['inicio'])} a {theme.hora(item['fin'])})"
         )
-        if item.get("tardanza"):
+        if es_entrada and item.get("tardanza"):
             linea += " - TARDANZA"
-        if item.get("salida_anticipada"):
+        if not es_entrada and item.get("salida_anticipada"):
             linea += " - SALIDA ANTICIPADA"
         lineas.append(linea)
     if tiene_ausencia:

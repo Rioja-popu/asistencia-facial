@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from PySide6.QtCore import QDate
-from PySide6.QtWidgets import QDateEdit, QFileDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDateEdit, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QVBoxLayout, QWidget
 
 from repositories import asistencia_repository, ausencia_repository, docente_repository
 from services import report_service, situacion_service
@@ -46,6 +46,10 @@ class InformesView(QWidget):
         layout.addLayout(filtros)
 
         self.tabla = theme.crear_tabla(report_service.COLUMNAS)
+        # Las columnas cortas se ajustan al texto; obligación y situación ocupan el resto
+        encabezado = self.tabla.horizontalHeader()
+        for columna in (0, 1, 3, 4, 5):
+            encabezado.setSectionResizeMode(columna, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.tabla)
 
         self.lbl_resumen = theme.etiqueta("", "subtitulo")

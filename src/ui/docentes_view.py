@@ -188,6 +188,10 @@ class DocentesView(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         contenedor = QWidget()
+        contenedor.setObjectName("formulario")
+        scroll.setStyleSheet(
+            "QScrollArea, QWidget#formulario { background-color: transparent; }"
+        )
         derecha = QVBoxLayout(contenedor)
         self.lbl_formulario = theme.etiqueta("Nuevo docente", "seccion")
         derecha.addWidget(self.lbl_formulario)
