@@ -19,6 +19,10 @@ CREATE TYPE tipo_ausencia AS ENUM (
     'particular',
     'medica'
 );
+CREATE TYPE tipo_no_laborable AS ENUM (
+    'feriado',
+    'receso'
+);
 CREATE TYPE estado_ausencia AS ENUM (
     'registrada',
     'pendiente_certificado',
@@ -122,12 +126,20 @@ CREATE TABLE asistencia(
     salida TIMESTAMP NULL,
     tardanza BOOLEAN NOT NULL DEFAULT FALSE,
     salida_anticipada BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Se completan cuando el personal administrativo carga o corrige la marcación a mano
+    corregida_por INT NULL,
+    corregida_el TIMESTAMP NULL,
+    motivo_correccion VARCHAR(255) NULL,
     PRIMARY KEY(id),
     CONSTRAINT asistencia_obligacion_check CHECK (
         (horario_catedra_id IS NOT NULL AND actividad_docente_id IS NULL)
         OR (horario_catedra_id IS NULL AND actividad_docente_id IS NOT NULL)
     ),
-    CONSTRAINT asistencia_salida_check CHECK (salida IS NULL OR salida >= entrada)
+    CONSTRAINT asistencia_salida_check CHECK (salida IS NULL OR salida >= entrada),
+    CONSTRAINT asistencia_correccion_check CHECK (
+        (corregida_por IS NULL AND corregida_el IS NULL AND motivo_correccion IS NULL)
+        OR (corregida_por IS NOT NULL AND corregida_el IS NOT NULL AND motivo_correccion IS NOT NULL)
+    )
 );
 -- Particulares y ausencias médicas cargadas por el personal administrativo
 CREATE TABLE ausencia(
@@ -145,6 +157,16 @@ CREATE TABLE ausencia(
         (tipo = 'particular' AND estado = 'registrada')
         OR (tipo = 'medica' AND estado <> 'registrada')
     )
+);
+-- Feriados (un día) y recesos (un período): esos días las clases habituales no se dictan
+CREATE TABLE dia_no_laborable(
+    id SERIAL NOT NULL,
+    tipo tipo_no_laborable NOT NULL,
+    descripcion VARCHAR(255) NOT NULL,
+    fecha_desde DATE NOT NULL,
+    fecha_hasta DATE NOT NULL,
+    PRIMARY KEY(id),
+    CONSTRAINT dia_no_laborable_periodo_check CHECK (fecha_hasta >= fecha_desde)
 );
 
 ALTER TABLE
@@ -198,3 +220,5 @@ ALTER TABLE
     ausencia ADD CONSTRAINT ausencia_docente_id_foreign FOREIGN KEY(docente_id) REFERENCES docente(id);
 ALTER TABLE
     ausencia ADD CONSTRAINT ausencia_usuario_id_foreign FOREIGN KEY(usuario_id) REFERENCES usuario(id);
+ALTER TABLE
+    asistencia ADD CONSTRAINT asistencia_corregida_por_foreign FOREIGN KEY(corregida_por) REFERENCES usuario(id);

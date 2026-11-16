@@ -17,6 +17,7 @@ from ui.docentes_view import DocentesView
 from ui.horarios_view import HorariosView
 from ui.informes_view import InformesView
 from ui.marcacion_view import MarcacionView
+from ui.no_laborables_view import NoLaborablesView
 
 
 class MainWindow(QWidget):
@@ -78,7 +79,8 @@ class MainWindow(QWidget):
             ("Horarios", HorariosView()),
             ("Actividades especiales", ActividadesView(self.nombre_usuario)),
             ("Ausencias", AusenciasView(self.usuario_id)),
-            ("Informes", InformesView(self.nombre_usuario)),
+            ("Feriados y recesos", NoLaborablesView()),
+            ("Informes", InformesView(self.usuario_id, self.nombre_usuario)),
         ]
 
         self.content_area = QStackedWidget()

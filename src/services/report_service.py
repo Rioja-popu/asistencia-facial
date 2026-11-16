@@ -1,9 +1,10 @@
-"""Informe de asistencia de un docente en un período, en Excel y PDF.
+"""Informes de asistencia (por docente y resumen general) y de actividades, en Excel y PDF.
 
 Recibe las filas ya clasificadas por situacion_service; no accede a la base.
 """
 
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
@@ -63,7 +64,9 @@ def filas_informe(filas):
 
 
 def filas_totales(filas):
-    return [("Obligaciones en el período", len(filas))] + situacion_service.totales(filas)
+    return [
+        ("Obligaciones en el período", len(situacion_service.exigibles(filas)))
+    ] + situacion_service.totales(filas)
 
 
 def generar_excel(ruta, encabezado, filas):
@@ -353,4 +356,152 @@ def generar_pdf_actividades(ruta, filas, usuario, ruta_escudo=None):
         elementos += [tabla, Spacer(1, 0.4 * cm), Paragraph(_texto_total_actividades(filas), normal)]
     else:
         elementos.append(Paragraph(MENSAJE_SIN_ACTIVIDADES, normal))
+    doc.build(elementos)
+
+
+# ------------------------------------------------------------ resumen general
+TITULO_GENERAL = "Resumen general de asistencia docente"
+COLUMNAS_GENERAL = (
+    ["Docente", "Obligaciones"]
+    + [titulo for titulo, _ in situacion_service.COLUMNAS_RESUMEN]
+    + ["Particulares"]
+)
+MENSAJE_SIN_DOCENTES = "Ningún docente tiene obligaciones en el período seleccionado."
+
+
+def filas_general(resumenes):
+    """resumenes: [(docente, filas clasificadas, texto de particulares), ...]
+
+    Deja afuera a los docentes sin obligaciones en el período.
+    """
+    return [
+        [f"{docente['apellido']}, {docente['nombre']}"]
+        + situacion_service.resumen_docente(filas)
+        + [particulares]
+        for docente, filas, particulares in resumenes
+        if filas
+    ]
+
+
+def fila_totales_general(filas):
+    cantidad = len(COLUMNAS_GENERAL) - 2
+    return (
+        ["Total"]
+        + [sum(f[i] for f in filas) for i in range(1, cantidad + 1)]
+        + [""]
+    )
+
+
+def encabezado_general(desde, hasta, usuario):
+    return [
+        ("Período:", f"{formatear_fecha(desde)} al {formatear_fecha(hasta)}"),
+        ("Informe generado por:", usuario),
+    ]
+
+
+def generar_excel_general(ruta, encabezado, filas):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Resumen"
+    negrita = Font(bold=True)
+    borde = Border(*(Side(style="thin", color="999999"),) * 4)
+    centrado = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ultima = len(COLUMNAS_GENERAL)
+
+    for fila, texto, tamano in ((1, INSTITUCION, 14), (2, TITULO_GENERAL, 12)):
+        ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=ultima)
+        celda = ws.cell(row=fila, column=1, value=texto)
+        celda.font = Font(bold=True, size=tamano, color=AZUL)
+        celda.alignment = centrado
+    fila = 4
+    for etiqueta, valor in encabezado:
+        ws.cell(row=fila, column=1, value=etiqueta).font = negrita
+        ws.merge_cells(start_row=fila, start_column=2, end_row=fila, end_column=ultima)
+        ws.cell(row=fila, column=2, value=valor)
+        fila += 1
+    fila += 1
+    if filas:
+        for columna, titulo in enumerate(COLUMNAS_GENERAL, start=1):
+            celda = ws.cell(row=fila, column=columna, value=titulo)
+            celda.font = Font(bold=True, color="FFFFFF")
+            celda.fill = PatternFill("solid", fgColor=AZUL)
+            celda.alignment = centrado
+            celda.border = borde
+        ws.row_dimensions[fila].height = 32
+        total = fila_totales_general(filas)
+        for datos in filas + [total]:
+            fila += 1
+            es_total = datos is total
+            for columna, valor in enumerate(datos, start=1):
+                celda = ws.cell(row=fila, column=columna, value=valor)
+                celda.border = borde
+                if columna > 1:
+                    celda.alignment = centrado
+                if es_total:
+                    celda.font = negrita
+    else:
+        ws.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=ultima)
+        ws.cell(row=fila, column=1, value=MENSAJE_SIN_DOCENTES)
+    ws.column_dimensions["A"].width = 36
+    for indice in range(2, ultima + 1):
+        ws.column_dimensions[get_column_letter(indice)].width = 14
+    wb.save(ruta)
+
+
+def generar_pdf_general(ruta, encabezado, filas, ruta_escudo=None):
+    estilos = getSampleStyleSheet()
+    normal = estilos["Normal"]
+    celda = ParagraphStyle("celda", parent=normal, fontSize=8, leading=10)
+    cabecera = ParagraphStyle(
+        "cabecera", parent=celda, textColor=colors.white,
+        fontName="Helvetica-Bold", alignment=1,
+    )
+    azul = colors.HexColor("#" + AZUL)
+    titulo = ParagraphStyle("titulo", parent=estilos["Title"], textColor=azul, fontSize=16)
+    subtitulo = ParagraphStyle(
+        "subtitulo", parent=estilos["Heading2"], textColor=azul, alignment=1
+    )
+    doc = SimpleDocTemplate(
+        ruta,
+        pagesize=landscape(A4),
+        leftMargin=1.5 * cm,
+        rightMargin=1.5 * cm,
+        topMargin=1.5 * cm,
+        bottomMargin=1.5 * cm,
+        title=TITULO_GENERAL,
+    )
+    elementos = []
+    if ruta_escudo:
+        elementos.append(Image(ruta_escudo, width=2.2 * cm, height=2.2 * cm))
+    elementos += [
+        Paragraph(INSTITUCION, titulo),
+        Paragraph(TITULO_GENERAL, subtitulo),
+    ]
+    elementos += [Paragraph(f"<b>{e}</b> {v}", normal) for e, v in encabezado]
+    elementos.append(Spacer(1, 0.5 * cm))
+    if filas:
+        datos = [[Paragraph(c, cabecera) for c in COLUMNAS_GENERAL]]
+        datos += [[Paragraph(f[0], celda)] + [str(v) for v in f[1:]] for f in filas]
+        datos.append([str(v) for v in fila_totales_general(filas)])
+        tabla = Table(
+            datos,
+            colWidths=[6.6 * cm] + [2.2 * cm] * (len(COLUMNAS_GENERAL) - 1),
+            repeatRows=1,
+        )
+        tabla.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), azul),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                    ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#999999")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#eef3f9")]),
+                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                ]
+            )
+        )
+        elementos.append(tabla)
+    else:
+        elementos.append(Paragraph(MENSAJE_SIN_DOCENTES, normal))
     doc.build(elementos)

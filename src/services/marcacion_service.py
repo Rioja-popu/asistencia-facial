@@ -10,6 +10,7 @@ Una obligación es un dict con:
     descripcion          texto para mostrar (cátedra o actividad)
     inicio, fin          datetime.time previstos
     asistencia_id, entrada, salida   None si todavía no hay marcación
+    no_laborable         "Feriado: ..." o "Receso: ..." si ese día no hay clases
 """
 
 from datetime import datetime, timedelta
@@ -36,6 +37,39 @@ def es_tardanza(entrada, inicio_previsto):
 
 def es_salida_anticipada(salida, fin_previsto):
     return _sin_segundos(salida) < datetime.combine(salida.date(), fin_previsto)
+
+
+def suspendida(obligacion):
+    """Clase que cae en un feriado o receso y que nadie marcó: no se dicta.
+
+    Las mesas y jornadas tienen fecha propia, así que se mantienen.
+    """
+    return bool(obligacion.get("no_laborable")) and not obligacion["entrada"]
+
+
+def preparar_correccion(fecha, inicio, fin, hora_entrada, hora_salida):
+    """Arma la marcación que el personal administrativo carga o corrige a mano.
+
+    hora_salida puede ser None (todavía sin salida). Lanza ValueError si las
+    horas no son coherentes. La tardanza y la salida anticipada se recalculan
+    con las mismas reglas que una marcación hecha con la cámara.
+    """
+    entrada = datetime.combine(fecha, hora_entrada)
+    if entrada < datetime.combine(fecha, inicio) - ANTICIPACION_ENTRADA:
+        raise ValueError(
+            "La entrada no puede ser más de 30 minutos anterior al inicio previsto."
+        )
+    if entrada >= datetime.combine(fecha, fin):
+        raise ValueError("La entrada tiene que ser anterior al fin previsto.")
+    salida = datetime.combine(fecha, hora_salida) if hora_salida else None
+    if salida and salida <= entrada:
+        raise ValueError("La salida tiene que ser posterior a la entrada.")
+    return {
+        "entrada": entrada,
+        "salida": salida,
+        "tardanza": es_tardanza(entrada, inicio),
+        "salida_anticipada": bool(salida) and es_salida_anticipada(salida, fin),
+    }
 
 
 def se_superponen(a, b):
@@ -88,8 +122,11 @@ def proponer_marcacion(obligaciones, ahora):
         items      obligaciones afectadas, cada una con las claves extra
                    "tardanza" (entradas) o "salida_anticipada" (salidas)
     """
-    vigentes, _ = separar_reemplazadas(obligaciones)
+    suspendidas = [o for o in obligaciones if suspendida(o)]
+    vigentes, _ = separar_reemplazadas([o for o in obligaciones if not suspendida(o)])
     if not vigentes:
+        if suspendidas:
+            return _rechazo(f"Hoy no hay clases ({suspendidas[0]['no_laborable']}).")
         return _rechazo("No tenés actividad programada para hoy.")
 
     bloques = armar_bloques(vigentes)

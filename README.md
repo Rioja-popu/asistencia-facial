@@ -81,7 +81,8 @@ python -m pytest tests
 | Horarios | Día y horario en que cada docente dicta cada cátedra; importación desde una planilla de Excel |
 | Actividades especiales | Jornadas institucionales y mesas de examen, con sus docentes y roles; listado exportable a Excel y PDF |
 | Ausencias | Particulares y ausencias médicas, con seguimiento del certificado |
-| Informes | Situación de cada obligación de un docente en un período; Excel y PDF |
+| Feriados y recesos | Días en que las clases habituales no se dictan |
+| Informes | Situación de cada obligación de un docente en un período, resumen general de todos los docentes y corrección manual de marcaciones; Excel y PDF |
 
 ## Modelo de datos
 
@@ -96,8 +97,9 @@ El esquema completo está en `database/initdb/01-schema.sql`.
 | `horario_catedra` | Obligación semanal: docente, cátedra, día, horario y período de vigencia |
 | `actividad_especial` | Jornada institucional o mesa de examen, con fecha y horario |
 | `actividad_docente` | Docentes de cada actividad; en las mesas, con rol (presidente, vocal, auxiliar) |
-| `asistencia` | Una fila por docente, fecha y obligación: entrada, salida, tardanza, salida anticipada |
+| `asistencia` | Una fila por docente, fecha y obligación: entrada, salida, tardanza, salida anticipada. Si se corrigió a mano, guarda quién, cuándo y el motivo |
 | `ausencia` | Particular o ausencia médica de un docente en una fecha, con su estado |
+| `dia_no_laborable` | Feriado (un día) o receso (de una fecha a otra) |
 
 Cambios respecto del sistema original:
 
@@ -155,6 +157,14 @@ Están en `src/services/marcacion_service.py` (qué registrar) y
   médica con certificado pendiente, médica justificada). Si la médica quedó no
   justificada pasa a "Ausencia médica no justificada".
 - **Ausente sin aviso**: obligación ya finalizada, sin marcación y sin ausencia cargada.
+- **Feriados y recesos**: las clases habituales de esos días no se pueden marcar,
+  figuran como "Sin clases" y no cuentan como obligación ni como ausencia. Las
+  mesas y jornadas cargadas para esos días se mantienen, porque tienen fecha propia.
+- **Corrección manual**: desde Informes, el personal administrativo puede cargar o
+  corregir la entrada y la salida de una obligación ya iniciada. El motivo es
+  obligatorio y quedan guardados el usuario y el momento de la corrección. La
+  tardanza y la salida anticipada se recalculan con las mismas reglas que una
+  marcación hecha con la cámara, y el informe la señala como "corregida a mano".
 - **Jornadas institucionales y mesas de examen**: usan las mismas reglas de
   entrada, tardanza, salida y salida anticipada que una clase.
 
@@ -190,7 +200,10 @@ completa), no hay modal: se muestra el motivo debajo de la cámara.
 | Docente inactivo | No se lo compara al reconocer y no puede marcar |
 | Rostro no reconocido | No se registra nada |
 | Cambio de horario durante el año | El horario anterior se da de baja con fecha (`vigente_hasta`) y se carga el nuevo; los informes anteriores no cambian |
-| Feriados | Fuera del alcance: una clase en un feriado figura como "Ausente sin aviso" |
+| Clase en un feriado o receso | Figura como "Sin clases" y no cuenta en los totales. Si el feriado se carga después de que alguien marcó, esa marcación se conserva y se informa normalmente |
+| Mesa o jornada en un feriado o receso | Se mantiene: se puede marcar y cuenta como obligación |
+| Docente que olvidó marcar la salida | Queda "Salida sin registrar" hasta que el personal administrativo la corrige desde Informes |
+| Corrección de una clase en feriado o de una obligación futura | No se admite |
 
 ## Informes
 
@@ -198,6 +211,17 @@ Se elige un docente y un período. Cada fila es una obligación con fecha, día,
 cátedra o actividad, horario previsto, entrada, salida y situación. Al pie se
 muestran los totales por situación. El Excel y el PDF agregan los datos del
 docente, los particulares usados en el año y el usuario que generó el informe.
+
+Con "Todos los docentes (resumen general)" se obtiene una fila por docente con
+obligaciones en el período: cantidad de obligaciones, en horario, tardanzas,
+salidas anticipadas, salidas sin registrar, ausencias con y sin aviso, médicas no
+justificadas y particulares usados en el año, más una fila de totales. También se
+exporta a Excel y PDF.
+
+"Corregir marcación" actúa sobre la obligación seleccionada del informe de un docente.
+
+Las bases creadas antes de estas funciones necesitan, una sola vez,
+`database/migraciones/02-feriados-y-correcciones.sql`.
 
 ## Estructura del proyecto
 

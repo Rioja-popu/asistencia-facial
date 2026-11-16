@@ -5,7 +5,7 @@ Trabaja sobre datos ya consultados; no accede a la base.
 
 from datetime import datetime
 
-from services.marcacion_service import separar_reemplazadas
+from services.marcacion_service import separar_reemplazadas, suspendida
 
 EN_HORARIO = "En horario"
 TARDANZA = "Tardanza"
@@ -17,6 +17,8 @@ AUSENTE_SIN_AVISO = "Ausente sin aviso"
 AUSENCIA_NO_JUSTIFICADA = "Ausencia médica no justificada"
 REEMPLAZADA = "Reemplazada por actividad especial"
 PROGRAMADA = "Programada"
+SIN_CLASES = "Sin clases"
+CORREGIDA = "Marcación corregida"
 
 DETALLE_AUSENCIA = {
     ("particular", "registrada"): "particular",
@@ -34,6 +36,19 @@ ORDEN_TOTALES = [
     AUSENTE_SIN_AVISO,
     AUSENCIA_NO_JUSTIFICADA,
     REEMPLAZADA,
+    SIN_CLASES,
+    CORREGIDA,
+]
+
+# Columnas del resumen general: (título, situación que cuenta)
+COLUMNAS_RESUMEN = [
+    ("En horario", EN_HORARIO),
+    ("Tardanzas", TARDANZA),
+    ("Salidas anticip.", SALIDA_ANTICIPADA),
+    ("Salidas sin reg.", SALIDA_SIN_REGISTRAR),
+    ("Aus. con aviso", AUSENTE_CON_AVISO),
+    ("Aus. sin aviso", AUSENTE_SIN_AVISO),
+    ("Médica no justif.", AUSENCIA_NO_JUSTIFICADA),
 ]
 
 
@@ -74,17 +89,27 @@ def clasificar(obligaciones, ausencias, ahora):
     fechas = sorted({o["fecha"] for o in obligaciones})
     for fecha in fechas:
         del_dia = [o for o in obligaciones if o["fecha"] == fecha]
-        vigentes, reemplazadas = separar_reemplazadas(del_dia)
+        _, reemplazadas = separar_reemplazadas(del_dia)
         ausencia = ausencias.get(fecha)
         for obligacion in sorted(del_dia, key=lambda o: (o["inicio"], o["fin"])):
-            if obligacion in reemplazadas and not obligacion["entrada"]:
+            if suspendida(obligacion):
+                etiquetas = [SIN_CLASES]
+                texto = f"{SIN_CLASES} ({obligacion['no_laborable']})"
+            elif obligacion in reemplazadas and not obligacion["entrada"]:
                 etiquetas, texto = [REEMPLAZADA], REEMPLAZADA
             elif obligacion["entrada"]:
                 etiquetas, texto = _situacion_presente(ausencia, obligacion, ahora)
             else:
                 etiquetas, texto = _situacion_ausente(ausencia, obligacion, ahora)
+            if obligacion.get("motivo_correccion"):
+                etiquetas = etiquetas + [CORREGIDA]
+                texto += f" [corregida a mano: {obligacion['motivo_correccion']}]"
             filas.append(
                 {
+                    "tipo": obligacion["tipo"],
+                    "asistencia_id": obligacion.get("asistencia_id"),
+                    "horario_catedra_id": obligacion.get("horario_catedra_id"),
+                    "actividad_docente_id": obligacion.get("actividad_docente_id"),
                     "fecha": fecha,
                     "descripcion": obligacion["descripcion"],
                     "inicio": obligacion["inicio"],
@@ -105,3 +130,14 @@ def totales(filas):
         for etiqueta in fila["etiquetas"]:
             conteo[etiqueta] = conteo.get(etiqueta, 0) + 1
     return [(nombre, conteo[nombre]) for nombre in ORDEN_TOTALES if nombre in conteo]
+
+
+def exigibles(filas):
+    """Obligaciones que el docente tenía que cumplir: no cuentan las de feriados y recesos."""
+    return [f for f in filas if SIN_CLASES not in f["etiquetas"]]
+
+
+def resumen_docente(filas):
+    """Fila del resumen general: obligaciones exigibles y cantidad de cada situación."""
+    conteo = dict(totales(filas))
+    return [len(exigibles(filas))] + [conteo.get(s, 0) for _, s in COLUMNAS_RESUMEN]
