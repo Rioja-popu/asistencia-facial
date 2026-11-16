@@ -56,7 +56,8 @@ que las dos versiones pueden convivir en la misma computadora.
    python src\main.py
    ```
 
-   Usuario de demostración: `admin` / `admin`.
+   Usuario de demostración: `admin` / `admin` (administrador). Conviene cambiarle
+   la contraseña con "Cambiar contraseña", al pie del menú.
 
 6. Opcional, en Windows: doble clic en `crear_acceso_directo.bat` para tener el
    acceso directo **Asistencia Docente IES 7** en el escritorio. Abre la
@@ -90,6 +91,10 @@ python -m pytest tests
 | Ausencias | Particulares y ausencias médicas, con seguimiento del certificado |
 | Feriados y recesos | Días en que las clases habituales no se dictan |
 | Informes | Situación de cada obligación de un docente en un período, resumen general de todos los docentes y corrección manual de marcaciones; Excel y PDF |
+| Usuarios | Sólo para el administrador: crear usuarios, restablecer contraseñas, eliminarlos o desactivarlos |
+
+Al pie del menú, cualquier usuario puede cambiar su contraseña y cerrar la sesión
+para que ingrese otro.
 
 ## Modelo de datos
 
@@ -97,7 +102,7 @@ El esquema completo está en `database/initdb/01-schema.sql`.
 
 | Tabla | Contenido |
 |---|---|
-| `usuario` | Personal administrativo que inicia sesión |
+| `usuario` | Personal que inicia sesión, con su rol (`administrador` o `administrativo`), si está activo y el hash de su contraseña |
 | `docente` | Docentes que marcan asistencia; `activo` permite la baja sin borrar historial. DNI y CUIL pueden quedar vacíos en los docentes importados |
 | `foto_docente` | Tres fotos por docente (frontal, lateral izquierdo, lateral derecho) |
 | `carrera`, `catedra` | Cada cátedra pertenece a una carrera |
@@ -253,6 +258,27 @@ exporta a Excel y PDF.
 
 Las bases creadas antes de estas funciones necesitan, una sola vez,
 `database/migraciones/02-feriados-y-correcciones.sql`.
+
+## Usuarios y contraseñas
+
+- **Dos roles**: el administrador además gestiona los usuarios; el administrativo
+  usa el resto del sistema y no ve la pantalla Usuarios.
+- **Contraseñas cifradas**: en la base se guarda el hash (PBKDF2-SHA256 con sal
+  propia de cada usuario, de la biblioteca estándar de Python), nunca la
+  contraseña. Mínimo de 6 caracteres.
+- **Ingreso** con nombre de usuario, correo, DNI o CUIL; ninguno puede repetirse
+  entre usuarios. El nombre de usuario no distingue mayúsculas.
+- **Contraseña olvidada**: el administrador la restablece desde Usuarios.
+- **Bajas**: nadie puede eliminar el usuario con el que está conectado, así que
+  siempre queda un administrador. Un usuario que cargó ausencias o corrigió
+  marcaciones no se borra, para no dejar esos registros sin autor: queda inactivo,
+  no puede ingresar y se puede reactivar.
+- El rol se elige al crear el usuario y no se cambia después.
+
+La lógica está en `src/services/usuario_service.py`. Las bases creadas antes de
+esta función necesitan, una sola vez, `database/migraciones/03-usuarios.sql`: los
+usuarios existentes quedan como administradores y su contraseña, que estaba en
+texto plano, se cifra sola la primera vez que ingresan.
 
 ## Estructura del proyecto
 

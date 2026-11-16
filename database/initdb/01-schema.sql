@@ -37,9 +37,16 @@ CREATE TABLE usuario(
     correo_electronico VARCHAR(255) NULL,
     dni VARCHAR(255) NULL,
     cuil VARCHAR(255) NULL,
+    -- Nunca la contraseña: su hash con sal (ver src/services/usuario_service.py)
     contrasenia VARCHAR(255) NOT NULL,
-    PRIMARY KEY(id)
+    -- El administrador además gestiona los usuarios
+    rol VARCHAR(20) NOT NULL DEFAULT 'administrativo',
+    -- Un usuario con ausencias o correcciones cargadas no se borra: se desactiva
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY(id),
+    CONSTRAINT usuario_rol_check CHECK (rol IN ('administrador', 'administrativo'))
 );
+CREATE UNIQUE INDEX usuario_nombre_sin_mayusculas_unique ON usuario (LOWER(nombre_usuario));
 CREATE TABLE docente(
     id SERIAL NOT NULL,
     apellido VARCHAR(255) NOT NULL,

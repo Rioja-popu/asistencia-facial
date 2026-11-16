@@ -10,14 +10,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from repositories.user_repository import UserRepository
+from repositories import user_repository
+from services import usuario_service
 from ui import theme
 
 
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.repo = UserRepository()
         self.main_window = None
 
         self.setWindowTitle(f"{theme.SISTEMA} - Inicio de sesión")
@@ -94,14 +94,21 @@ class LoginWindow(QWidget):
 
     def iniciar_sesion(self):
         identificador = self.identifier_input.text().strip()
-        contrasenia = self.password_input.text().strip()
+        contrasenia = self.password_input.text()
 
         if identificador == "" or contrasenia == "":
             QMessageBox.warning(self, "Datos incompletos", "Ingrese usuario y contraseña.")
             return
 
         try:
-            usuario = self.repo.find_by_credentials(identificador, contrasenia)
+            usuario = usuario_service.autenticar(
+                user_repository.buscar_para_ingreso(identificador), contrasenia
+            )
+            if usuario and not usuario_service.esta_cifrada(usuario["contrasenia"]):
+                # Contraseña anterior a la migración: se cifra en el primer ingreso
+                user_repository.guardar_contrasenia(
+                    usuario["id"], usuario_service.cifrar(contrasenia)
+                )
         except Exception as e:
             theme.error_bd(self, e)
             return
@@ -113,6 +120,15 @@ class LoginWindow(QWidget):
         # Import diferido: la ventana principal carga el reconocimiento facial, que tarda
         from ui.main_window import MainWindow
 
-        self.main_window = MainWindow(usuario[0], usuario[1])
+        self.password_input.clear()
+        self.main_window = MainWindow(usuario, self._volver_al_login)
         self.main_window.show()
-        self.close()
+        self.hide()
+
+    def _volver_al_login(self):
+        """Al cerrar sesión: se descarta la ventana principal y se pide ingresar de nuevo."""
+        self.main_window.deleteLater()
+        self.main_window = None
+        self.identifier_input.clear()
+        self.show()
+        self.identifier_input.setFocus()

@@ -1,6 +1,7 @@
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -9,9 +10,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from repositories import user_repository
+from services import usuario_service
 from ui import iconos, theme
 from ui.actividades_view import ActividadesView
 from ui.ausencias_view import AusenciasView
+from ui.contrasenia_dialog import ContraseniaDialog
 from ui.catedras_view import CatedrasView
 from ui.docentes_view import DocentesView
 from ui.horarios_view import HorariosView
@@ -19,15 +23,18 @@ from ui.informes_view import InformesView
 from ui.inicio_view import InicioView
 from ui.marcacion_view import MarcacionView
 from ui.no_laborables_view import NoLaborablesView
+from ui.usuarios_view import UsuariosView
 
 
 class MainWindow(QWidget):
     """Ventana principal: menú lateral con el escudo y las secciones del sistema."""
 
-    def __init__(self, usuario_id, nombre_usuario):
+    def __init__(self, usuario, al_cerrar_sesion=None):
         super().__init__()
-        self.usuario_id = usuario_id
-        self.nombre_usuario = nombre_usuario
+        self.usuario_id = usuario["id"]
+        self.nombre_usuario = usuario["nombre_usuario"]
+        self.al_cerrar_sesion = al_cerrar_sesion
+        self.cerrando_sesion = False
         self.setWindowTitle(f"{theme.SISTEMA} - {theme.INSTITUCION}")
         self.setWindowIcon(QIcon(theme.RUTA_ESCUDO))
         self.resize(1180, 760)
@@ -53,6 +60,8 @@ class MainWindow(QWidget):
                 border: none; border-left: 4px solid transparent; border-radius: 0px;
             }}
             QPushButton:hover {{ background-color: {theme.AZUL_CLARO}; }}
+            QPushButton[rol="cuenta"] {{ padding: 8px 12px; font-size: 12px; color: #c9d6e8; }}
+            QPushButton[rol="cuenta"]:hover {{ color: #ffffff; }}
             QPushButton:checked {{
                 background-color: #1d4a80; color: {theme.DORADO}; font-weight: bold;
                 border-left: 4px solid {theme.DORADO};
@@ -84,6 +93,8 @@ class MainWindow(QWidget):
             ("Feriados y recesos", "feriados", NoLaborablesView()),
             ("Informes", "informes", InformesView(self.usuario_id, self.nombre_usuario)),
         ]
+        if usuario["rol"] == usuario_service.ADMINISTRADOR:
+            secciones.append(("Usuarios", "usuarios", UsuariosView(self.usuario_id)))
 
         self.content_area = QStackedWidget()
         self.content_area.setObjectName("contenido")
@@ -102,10 +113,23 @@ class MainWindow(QWidget):
             self.content_area.addWidget(vista)
 
         sidebar_layout.addStretch()
-        lbl_usuario = QLabel(f"Usuario: {self.nombre_usuario}")
+        lbl_usuario = QLabel(
+            f"{self.nombre_usuario}\n{usuario_service.ROLES[usuario['rol']]}"
+        )
         lbl_usuario.setObjectName("usuario")
         lbl_usuario.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sidebar_layout.addWidget(lbl_usuario)
+        sidebar_layout.addSpacing(6)
+        for texto, icono, accion in (
+            ("Cambiar contraseña", "llave", self._cambiar_contrasenia),
+            ("Cerrar sesión", "salir", self._cerrar_sesion),
+        ):
+            btn = QPushButton("  " + texto)
+            btn.setProperty("rol", "cuenta")
+            btn.setIcon(iconos.icono(icono, "#c9d6e8"))
+            btn.setIconSize(QSize(16, 16))
+            btn.clicked.connect(accion)
+            sidebar_layout.addWidget(btn)
 
         main_layout.addWidget(sidebar)
         main_layout.addWidget(self.content_area)
@@ -122,8 +146,40 @@ class MainWindow(QWidget):
         for i, btn in enumerate(self.botones):
             btn.setChecked(i == index)
 
+    def _cambiar_contrasenia(self):
+        try:
+            guardada = user_repository.obtener(self.usuario_id)["contrasenia"]
+        except Exception as e:
+            theme.error_bd(self, e)
+            return
+        dialogo = ContraseniaDialog(
+            "Cambiar contraseña",
+            f"Contraseña del usuario \"{self.nombre_usuario}\".",
+            guardada, self,
+        )
+        if not dialogo.exec():
+            return
+        try:
+            user_repository.guardar_contrasenia(self.usuario_id, dialogo.nueva)
+        except Exception as e:
+            theme.error_bd(self, e)
+            return
+        theme.informar(self, "Contraseña cambiada", "Usá la contraseña nueva la próxima vez.")
+
+    def _cerrar_sesion(self):
+        if not theme.confirmar(self, "Cerrar sesión", "¿Cerrar la sesión y volver al inicio?"):
+            return
+        self.cerrando_sesion = True
+        self.close()
+
     def closeEvent(self, event):
         if self.view_marcacion.camera_open:
             self.view_marcacion._cerrar_camara()
         self.view_marcacion.esperar_cierre()
         super().closeEvent(event)
+        if self.al_cerrar_sesion:
+            if self.cerrando_sesion:
+                self.al_cerrar_sesion()
+            else:
+                # Se cerró la ventana: termina la aplicación, no queda el login oculto
+                QApplication.quit()
