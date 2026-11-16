@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QStackedWidget,
     QVBoxLayout,
@@ -19,6 +18,7 @@ from ui import theme
 from ui.corregir_marcacion_dialog import CorregirMarcacionDialog
 
 TODOS = "todos"
+MENSAJE_INICIAL = "Elegí un docente y el período, y presioná Consultar."
 
 
 class InformesView(QWidget):
@@ -61,16 +61,11 @@ class InformesView(QWidget):
         filtros.addWidget(theme.boton("Consultar", al_hacer_clic=self._consultar))
         layout.addLayout(filtros)
 
-        self.tabla = theme.crear_tabla(report_service.COLUMNAS)
-        # Las columnas cortas se ajustan al texto; obligación y situación ocupan el resto
-        encabezado = self.tabla.horizontalHeader()
-        for columna in (0, 1, 3, 4, 5):
-            encabezado.setSectionResizeMode(columna, QHeaderView.ResizeMode.ResizeToContents)
-        self.tabla_general = theme.crear_tabla(report_service.COLUMNAS_GENERAL)
-        self.tabla_general.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
+        self.tabla = theme.crear_tabla(report_service.COLUMNAS, MENSAJE_INICIAL)
+        # Títulos en dos renglones para que las diez columnas entren sin desplazarse
+        self.tabla_general = theme.crear_tabla(
+            [titulo.replace(" ", "\n", 1) for titulo in report_service.COLUMNAS_GENERAL]
         )
-        self.tabla_general.horizontalHeader().setStretchLastSection(True)
         self.tablas = QStackedWidget()
         self.tablas.addWidget(self.tabla)
         self.tablas.addWidget(self.tabla_general)
@@ -118,6 +113,8 @@ class InformesView(QWidget):
         self.resultado = None
         self.tabla.setRowCount(0)
         self.tabla_general.setRowCount(0)
+        self.tabla.fijar_mensaje_vacio(MENSAJE_INICIAL)
+        self.tablas.setCurrentWidget(self.tabla)
         self.lbl_resumen.setText("")
         self._habilitar_exportacion(False)
 
@@ -141,8 +138,14 @@ class InformesView(QWidget):
             return
         self.resultado = (self.docentes[docente_id], desde, hasta, filas)
         self.tablas.setCurrentWidget(self.tabla)
+        self.tabla.fijar_mensaje_vacio(report_service.MENSAJE_SIN_OBLIGACIONES)
+        columna_situacion = len(report_service.COLUMNAS) - 1
         theme.llenar_tabla(
-            self.tabla, report_service.filas_informe(filas), list(range(len(filas)))
+            self.tabla, report_service.filas_informe(filas), list(range(len(filas))),
+            {
+                (i, columna_situacion): situacion_service.gravedad(f["etiquetas"])
+                for i, f in enumerate(filas)
+            },
         )
         if filas:
             self.lbl_resumen.setText(
@@ -174,10 +177,21 @@ class InformesView(QWidget):
         filas = report_service.filas_general(resumenes)
         self.resultado = (None, desde, hasta, filas)
         self.tablas.setCurrentWidget(self.tabla_general)
+        self.tabla_general.fijar_mensaje_vacio(report_service.MENSAJE_SIN_DOCENTES)
+        # Sólo se colorean las cantidades distintas de cero, para que resalten
+        estados = {
+            (i, 2 + j): situacion_service.gravedad([situacion])
+            for i, fila in enumerate(filas)
+            for j, (_, situacion) in enumerate(situacion_service.COLUMNAS_RESUMEN)
+            if fila[2 + j]
+        }
         theme.llenar_tabla(
             self.tabla_general,
             filas + [report_service.fila_totales_general(filas)] if filas else [],
+            estados=estados,
         )
+        if filas:
+            theme.resaltar_fila(self.tabla_general, len(filas))
         if filas:
             self.lbl_resumen.setText(
                 f"Docentes con obligaciones en el período: {len(filas)}. "

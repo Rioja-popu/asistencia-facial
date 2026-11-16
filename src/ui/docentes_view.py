@@ -180,7 +180,9 @@ class DocentesView(QWidget):
         izquierda.addWidget(
             theme.etiqueta("Seleccioná un docente para editarlo.", "subtitulo")
         )
-        self.tabla = theme.crear_tabla(["Docente", "CUIL", "Estado"])
+        self.tabla = theme.crear_tabla(
+            ["Docente", "CUIL", "Estado"], "Todavía no hay docentes cargados."
+        )
         self.tabla.itemSelectionChanged.connect(self._cargar_seleccionado)
         izquierda.addWidget(self.tabla)
         fila = QHBoxLayout()

@@ -43,7 +43,8 @@ class HorariosView(QWidget):
         layout.addWidget(self.combo_docente)
 
         self.tabla = theme.crear_tabla(
-            ["Día", "Horario", "Cátedra", "Carrera", "Vigente desde", "Vigente hasta"]
+            ["Día", "Horario", "Cátedra", "Carrera", "Vigente desde", "Vigente hasta"],
+            "Este docente todavía no tiene horarios cargados.",
         )
         layout.addWidget(self.tabla)
 

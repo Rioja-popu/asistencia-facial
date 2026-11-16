@@ -55,7 +55,10 @@ class NoLaborablesView(QWidget):
         layout.addWidget(tarjeta)
         layout.addWidget(theme.boton("Agregar", "confirmar", self._agregar))
 
-        self.tabla = theme.crear_tabla(["Tipo", "Descripción", "Desde", "Hasta", "Días"])
+        self.tabla = theme.crear_tabla(
+            ["Tipo", "Descripción", "Desde", "Hasta", "Días"],
+            "Todavía no hay feriados ni recesos cargados.",
+        )
         layout.addWidget(self.tabla)
 
         fila = QHBoxLayout()

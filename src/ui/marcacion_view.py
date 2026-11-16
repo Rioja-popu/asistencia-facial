@@ -3,39 +3,14 @@ from datetime import datetime
 
 from PySide6.QtCore import QEvent, QRect, Qt, QTimer
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from repositories import asistencia_repository, ausencia_repository, docente_repository
 from services import marcacion_service
 from services.camera_service import CameraWorker
 from services.facial_service import FacialRecognitionService
 from ui import theme
-
-
-def texto_confirmacion(nombre, propuesta, ahora, tiene_ausencia):
-    """Texto del modal: quién fue reconocido y qué operación se propone registrar."""
-    es_entrada = propuesta["operacion"] == marcacion_service.ENTRADA
-    lineas = [
-        f"Docente reconocido: {nombre}",
-        "",
-        f"Operación: registrar {'ENTRADA' if es_entrada else 'SALIDA'} "
-        f"a las {ahora.strftime('%H:%M')}",
-        "",
-    ]
-    for item in propuesta["items"]:
-        linea = (
-            f"• {item['descripcion']} "
-            f"({theme.hora(item['inicio'])} a {theme.hora(item['fin'])})"
-        )
-        if es_entrada and item.get("tardanza"):
-            linea += " - TARDANZA"
-        if not es_entrada and item.get("salida_anticipada"):
-            linea += " - SALIDA ANTICIPADA"
-        lineas.append(linea)
-    if tiene_ausencia:
-        lineas += ["", "Atención: tenés una ausencia cargada para hoy."]
-    lineas += ["", "¿Confirmás la marcación?"]
-    return "\n".join(lineas)
+from ui.confirmar_marcacion_dialog import ConfirmarMarcacionDialog
 
 
 class ContenedorVideo(QWidget):
@@ -241,9 +216,8 @@ class MarcacionView(QWidget):
 
         tiene_ausencia = hoy in ausencia_repository.obtener_ausencias(docente_id, hoy, hoy)
         self._mostrar_overlay("Esperando confirmación...")
-        confirmado = self._pedir_confirmacion(
-            texto_confirmacion(nombre, propuesta, ahora, tiene_ausencia)
-        )
+        foto = docente_repository.obtener_fotos(docente_id).get("frontal")
+        confirmado = self._pedir_confirmacion(nombre, foto, propuesta, ahora, tiene_ausencia)
         if not confirmado:
             self._mostrar_resultado(f"Marcación cancelada por {nombre}. No se registró nada.")
             self._mostrar_overlay("Marcación cancelada", temporal=True)
@@ -266,18 +240,10 @@ class MarcacionView(QWidget):
             )
             self._mostrar_overlay("Salida marcada", temporal=True)
 
-    def _pedir_confirmacion(self, texto):
+    def _pedir_confirmacion(self, nombre, foto, propuesta, ahora, tiene_ausencia):
         """Modal con OK y Cancelar. Devuelve True sólo si se eligió OK."""
-        modal = QMessageBox(self)
-        modal.setWindowTitle("Confirmar marcación")
-        modal.setIcon(QMessageBox.Icon.Question)
-        modal.setText(texto)
-        modal.setStandardButtons(
-            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
-        )
-        modal.button(QMessageBox.StandardButton.Cancel).setText("Cancelar")
-        modal.setDefaultButton(QMessageBox.StandardButton.Ok)
-        return modal.exec() == QMessageBox.StandardButton.Ok
+        modal = ConfirmarMarcacionDialog(nombre, foto, propuesta, ahora, tiene_ausencia, self)
+        return modal.exec() == QDialog.DialogCode.Accepted
 
     # ---------------------------------------------------------------- mensajes
     def _mostrar_overlay(self, texto, temporal=False):

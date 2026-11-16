@@ -2,8 +2,8 @@
 
 import os
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
 )
@@ -28,6 +29,19 @@ TEXTO = "#1f2d3d"
 GRIS = "#6b7785"
 VERDE = "#2e8b57"
 ROJO = "#c0392b"
+
+# Colores de los estados de asistencia: clave -> (fondo, texto)
+COLORES_ESTADO = {
+    "bien": ("#dcf2e4", "#1e6b41"),
+    "atencion": ("#fdf0c8", "#8a5a00"),
+    "mal": ("#f9dcd8", "#a3261a"),
+    "aviso": ("#d9eefb", "#125a8c"),
+    "neutro": ("#e8ecf1", "#56616e"),
+}
+ROL_ESTADO = Qt.ItemDataRole.UserRole + 1
+ANCHO_MAXIMO_COLUMNA = 420
+# Si la tabla no entra, las columnas más anchas que esto se achican hasta este ancho
+ANCHO_RECORTABLE = 200
 
 RUTA_ESCUDO = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "escudo.png"
@@ -183,8 +197,54 @@ def boton(texto, rol=None, al_hacer_clic=None):
     return widget
 
 
+class PintorEstado(QStyledItemDelegate):
+    """Dibuja como etiqueta de color las celdas que tienen un estado asignado."""
+
+    def paint(self, painter, option, index):
+        estado = index.data(ROL_ESTADO)
+        if estado not in COLORES_ESTADO:
+            super().paint(painter, option, index)
+            return
+        fondo, texto = COLORES_ESTADO[estado]
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        area = QRectF(option.rect).adjusted(4, 3, -4, -3)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(fondo))
+        painter.drawRoundedRect(area, 9, 9)
+        fuente = QFont(option.font)
+        fuente.setBold(True)
+        painter.setFont(fuente)
+        painter.setPen(QColor(texto))
+        interior = area.adjusted(8, 0, -8, 0)
+        contenido = painter.fontMetrics().elidedText(
+            str(index.data() or ""), Qt.TextElideMode.ElideRight, int(interior.width())
+        )
+        alineacion = index.data(Qt.ItemDataRole.TextAlignmentRole) or int(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
+        painter.drawText(interior, int(alineacion), contenido)
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        medida = super().sizeHint(option, index)
+        if index.data(ROL_ESTADO) in COLORES_ESTADO:
+            # Lugar para la negrita y los bordes redondeados
+            medida.setWidth(medida.width() + 12 + len(str(index.data() or "")))
+        return medida
+
+
 class TablaSeleccionable(QTableWidget):
-    """Tabla en la que un clic en la fila ya elegida, o fuera de las filas, la deselecciona."""
+    """Tabla del sistema.
+
+    Un clic en la fila ya elegida, o fuera de las filas, la deselecciona. Las
+    columnas toman el ancho de su contenido y se reparten el espacio que sobra;
+    si no entran, se acortan las de texto largo (el texto completo queda en la
+    ayuda de la celda) y recién después aparece la barra horizontal.
+    Si no hay filas, muestra un mensaje en lugar de quedar en blanco.
+    """
+
+    mensaje_vacio = "No hay datos para mostrar."
 
     def mousePressEvent(self, event):
         item = self.itemAt(event.position().toPoint())
@@ -193,8 +253,56 @@ class TablaSeleccionable(QTableWidget):
             return
         super().mousePressEvent(event)
 
+    def fijar_mensaje_vacio(self, texto):
+        self.mensaje_vacio = texto
+        self.viewport().update()
 
-def crear_tabla(columnas):
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.rowCount() == 0 and self.mensaje_vacio:
+            painter = QPainter(self.viewport())
+            painter.setPen(QColor(GRIS))
+            painter.drawText(
+                self.viewport().rect().adjusted(20, 10, -20, -10),
+                int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap),
+                self.mensaje_vacio,
+            )
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.ajustar_columnas()
+
+    def ajustar_columnas(self):
+        encabezado = self.horizontalHeader()
+        anchos = [
+            min(
+                max(self.sizeHintForColumn(c), encabezado.sectionSizeHint(c)) + 8,
+                ANCHO_MAXIMO_COLUMNA,
+            )
+            for c in range(self.columnCount())
+        ]
+        sobra = self.viewport().width() - sum(anchos)
+        while sobra < 0 and max(anchos, default=0) > ANCHO_RECORTABLE:
+            mayor = anchos.index(max(anchos))
+            recorte = min(-sobra, anchos[mayor] - ANCHO_RECORTABLE, 20)
+            anchos[mayor] -= recorte
+            sobra += recorte
+        total = sum(anchos)
+        if sobra < 0 and -sobra <= total * 0.08:
+            # Falta muy poco: se ajustan todas un poco antes que mostrar la barra
+            anchos = [a * (total + sobra) // total for a in anchos]
+            sobra = 0
+        if sobra > 0 and anchos:
+            # El espacio libre se reparte según el ancho que ya necesita cada columna
+            total = sum(anchos)
+            extras = [sobra * a // total for a in anchos]
+            extras[-1] += sobra - sum(extras)
+            anchos = [a + e for a, e in zip(anchos, extras)]
+        for columna, ancho in enumerate(anchos):
+            self.setColumnWidth(columna, ancho)
+
+
+def crear_tabla(columnas, mensaje_vacio=None):
     tabla = TablaSeleccionable(0, len(columnas))
     tabla.setHorizontalHeaderLabels(columnas)
     tabla.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -203,20 +311,42 @@ def crear_tabla(columnas):
     tabla.setAlternatingRowColors(True)
     tabla.setFocusPolicy(Qt.FocusPolicy.NoFocus)
     tabla.verticalHeader().setVisible(False)
-    tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+    tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+    tabla.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+    tabla.setItemDelegate(PintorEstado(tabla))
+    if mensaje_vacio:
+        tabla.mensaje_vacio = mensaje_vacio
     return tabla
 
 
-def llenar_tabla(tabla, filas, ids=None):
-    """filas: lista de listas de texto. ids: valor asociado a cada fila."""
+def llenar_tabla(tabla, filas, ids=None, estados=None):
+    """filas: lista de listas de texto. ids: valor asociado a cada fila.
+
+    estados: {(fila, columna): clave de COLORES_ESTADO} para las celdas con color.
+    """
+    estados = estados or {}
     tabla.clearSelection()
     tabla.setRowCount(len(filas))
     for i, fila in enumerate(filas):
         for j, valor in enumerate(fila):
-            item = QTableWidgetItem("" if valor is None else str(valor))
+            texto = "" if valor is None else str(valor)
+            item = QTableWidgetItem(texto)
+            item.setToolTip(texto)
             if ids is not None:
                 item.setData(Qt.ItemDataRole.UserRole, ids[i])
+            if (i, j) in estados:
+                item.setData(ROL_ESTADO, estados[(i, j)])
             tabla.setItem(i, j, item)
+    tabla.ajustar_columnas()
+
+
+def resaltar_fila(tabla, fila):
+    """Pone en negrita una fila, por ejemplo la de totales."""
+    for columna in range(tabla.columnCount()):
+        item = tabla.item(fila, columna)
+        fuente = item.font()
+        fuente.setBold(True)
+        item.setFont(fuente)
 
 
 def id_seleccionado(tabla):

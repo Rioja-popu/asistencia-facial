@@ -92,7 +92,6 @@ class ImportarHorariosDialog(QDialog):
             if color:
                 for j in range(self.tabla.columnCount()):
                     self.tabla.item(i, j).setForeground(color)
-        self.tabla.resizeColumnsToContents()
 
         self.lbl_resumen.setText(
             f"Horarios a crear: {len(plan['horarios'])}. "

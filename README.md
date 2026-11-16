@@ -75,6 +75,7 @@ python -m pytest tests
 
 | Pantalla | Para qué sirve |
 |---|---|
+| Inicio | Resumen del día: docentes con actividad, quiénes ya marcaron, quiénes faltan y si es feriado, con el detalle de cada obligación de hoy |
 | Marcación | Cámara, reconocimiento y confirmación de entrada o salida |
 | Docentes | Alta y edición de docentes con sus tres fotos; baja lógica (inactivo) o eliminación definitiva con todo su historial; importación desde un listado en Excel o CSV |
 | Carreras y cátedras | Carreras del instituto y cátedras de cada una |
@@ -195,9 +196,10 @@ Están en `src/services/marcacion_service.py` (qué registrar) y
 2. Si reconoce a un docente, el hilo de la cámara **pausa el reconocimiento** antes
    de avisar a la pantalla. El video sigue viéndose.
 3. El sistema busca las obligaciones del día y decide qué proponer.
-4. Si hay algo para registrar, muestra un modal con el docente, la operación
-   (entrada o salida), la cátedra o actividad, el horario previsto y los avisos
-   (tardanza, salida anticipada), con los botones **OK** y **Cancelar**.
+4. Si hay algo para registrar, muestra un modal con la foto y el nombre del
+   docente, la operación resaltada (entrada en verde, salida en azul) con la
+   hora, la cátedra o actividad, el horario previsto y los avisos (tardanza,
+   salida anticipada), con los botones **OK** y **Cancelar**.
 5. Con **OK** se guarda. Con **Cancelar** no se ejecuta ningún `INSERT` ni `UPDATE`.
 6. En los dos casos, al cerrarse el modal el reconocimiento se reanuda.
 
@@ -230,7 +232,9 @@ completa), no hay modal: se muestra el motivo debajo de la cámara.
 
 Se elige un docente y un período. Cada fila es una obligación con fecha, día,
 cátedra o actividad, horario previsto, entrada, salida y situación. Al pie se
-muestran los totales por situación. El Excel y el PDF agregan los datos del
+muestran los totales por situación. En pantalla la situación va con color: verde
+en horario, amarillo tardanza o problema con la salida, rojo ausente sin aviso,
+celeste ausente con aviso y gris lo que no cuenta o todavía no ocurrió. El Excel y el PDF agregan los datos del
 docente, los particulares usados en el año y el usuario que generó el informe.
 
 Con "Todos los docentes (resumen general)" se obtiene una fila por docente con

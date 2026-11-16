@@ -13,6 +13,21 @@ def listar():
     )
 
 
+def del_dia(fecha):
+    """Feriados y recesos que abarcan esa fecha, como textos "Feriado: ..."."""
+    filas = consultar(
+        """
+        SELECT CASE tipo WHEN 'feriado' THEN 'Feriado' ELSE 'Receso' END
+               || ': ' || descripcion AS texto
+        FROM dia_no_laborable
+        WHERE %s BETWEEN fecha_desde AND fecha_hasta
+        ORDER BY tipo, id;
+        """,
+        (fecha,),
+    )
+    return [fila["texto"] for fila in filas]
+
+
 def registrar(tipo, descripcion, desde, hasta):
     ejecutar(
         """

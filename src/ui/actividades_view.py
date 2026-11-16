@@ -5,7 +5,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QFrame,
     QHBoxLayout,
-    QHeaderView,
     QLineEdit,
     QTimeEdit,
     QVBoxLayout,
@@ -42,10 +41,10 @@ class ActividadesView(QWidget):
                 "subtitulo",
             )
         )
-        self.tabla = theme.crear_tabla(["Fecha", "Horario", "Tipo", "Descripción", "Docentes"])
-        encabezado = self.tabla.horizontalHeader()
-        for columna in (0, 1, 2, 4):
-            encabezado.setSectionResizeMode(columna, QHeaderView.ResizeMode.ResizeToContents)
+        self.tabla = theme.crear_tabla(
+            ["Fecha", "Horario", "Tipo", "Descripción", "Docentes"],
+            "Todavía no hay actividades especiales cargadas.",
+        )
         self.tabla.itemSelectionChanged.connect(self._cargar_participantes)
         izquierda.addWidget(self.tabla)
 
@@ -88,7 +87,9 @@ class ActividadesView(QWidget):
         derecha = QVBoxLayout()
         self.lbl_participantes = theme.etiqueta("Docentes de la actividad", "seccion")
         derecha.addWidget(self.lbl_participantes)
-        self.tabla_participantes = theme.crear_tabla(["Docente", "Rol"])
+        self.tabla_participantes = theme.crear_tabla(
+            ["Docente", "Rol"], "Elegí una actividad para ver sus docentes."
+        )
         derecha.addWidget(self.tabla_participantes)
         self.combo_docente = theme.combo([])
         self.combo_rol = theme.combo([(nombre, rol) for rol, nombre in ROLES.items()])

@@ -16,7 +16,7 @@ class CatedrasView(QWidget):
         # Carreras
         carreras = QVBoxLayout()
         carreras.addWidget(theme.etiqueta("Carreras"))
-        self.tabla_carreras = theme.crear_tabla(["Carrera"])
+        self.tabla_carreras = theme.crear_tabla(["Carrera"], "Todavía no hay carreras cargadas.")
         carreras.addWidget(self.tabla_carreras)
         self.input_carrera = QLineEdit()
         self.input_carrera.setPlaceholderText("Nombre de la carrera")
@@ -30,7 +30,9 @@ class CatedrasView(QWidget):
         # Cátedras
         catedras = QVBoxLayout()
         catedras.addWidget(theme.etiqueta("Cátedras"))
-        self.tabla_catedras = theme.crear_tabla(["Cátedra", "Año", "Carrera"])
+        self.tabla_catedras = theme.crear_tabla(
+            ["Cátedra", "Año", "Carrera"], "Todavía no hay cátedras cargadas."
+        )
         catedras.addWidget(self.tabla_catedras)
         fila = QHBoxLayout()
         self.combo_carrera = theme.combo([])

@@ -68,7 +68,8 @@ class AusenciasView(QWidget):
         self.chk_pendientes.toggled.connect(self._cargar_tabla)
         layout.addWidget(self.chk_pendientes)
         self.tabla = theme.crear_tabla(
-            ["Fecha", "Docente", "Tipo", "Estado", "Certificado", "Observación", "Cargó"]
+            ["Fecha", "Docente", "Tipo", "Estado", "Certificado", "Observación", "Cargó"],
+            "No hay ausencias cargadas.",
         )
         layout.addWidget(self.tabla)
 

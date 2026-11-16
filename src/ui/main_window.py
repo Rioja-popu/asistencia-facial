@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -9,13 +9,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui import theme
+from ui import iconos, theme
 from ui.actividades_view import ActividadesView
 from ui.ausencias_view import AusenciasView
 from ui.catedras_view import CatedrasView
 from ui.docentes_view import DocentesView
 from ui.horarios_view import HorariosView
 from ui.informes_view import InformesView
+from ui.inicio_view import InicioView
 from ui.marcacion_view import MarcacionView
 from ui.no_laborables_view import NoLaborablesView
 
@@ -48,7 +49,7 @@ class MainWindow(QWidget):
             QLabel#usuario {{ font-size: 12px; color: #c9d6e8; }}
             QPushButton {{
                 background-color: transparent; color: #ffffff; text-align: left;
-                padding: 11px 14px; font-size: 13px; font-weight: normal;
+                padding: 11px 12px; font-size: 13px; font-weight: normal;
                 border: none; border-left: 4px solid transparent; border-radius: 0px;
             }}
             QPushButton:hover {{ background-color: {theme.AZUL_CLARO}; }}
@@ -73,14 +74,15 @@ class MainWindow(QWidget):
 
         self.view_marcacion = MarcacionView()
         secciones = [
-            ("Marcación", self.view_marcacion),
-            ("Docentes", DocentesView()),
-            ("Carreras y cátedras", CatedrasView()),
-            ("Horarios", HorariosView()),
-            ("Actividades especiales", ActividadesView(self.nombre_usuario)),
-            ("Ausencias", AusenciasView(self.usuario_id)),
-            ("Feriados y recesos", NoLaborablesView()),
-            ("Informes", InformesView(self.usuario_id, self.nombre_usuario)),
+            ("Inicio", "inicio", InicioView()),
+            ("Marcación", "marcacion", self.view_marcacion),
+            ("Docentes", "docentes", DocentesView()),
+            ("Carreras y cátedras", "catedras", CatedrasView()),
+            ("Horarios", "horarios", HorariosView()),
+            ("Actividades especiales", "actividades", ActividadesView(self.nombre_usuario)),
+            ("Ausencias", "ausencias", AusenciasView(self.usuario_id)),
+            ("Feriados y recesos", "feriados", NoLaborablesView()),
+            ("Informes", "informes", InformesView(self.usuario_id, self.nombre_usuario)),
         ]
 
         self.content_area = QStackedWidget()
@@ -89,8 +91,10 @@ class MainWindow(QWidget):
             f"QStackedWidget#contenido {{ background-color: {theme.FONDO}; }}"
         )
         self.botones = []
-        for indice, (texto, vista) in enumerate(secciones):
-            btn = QPushButton(texto)
+        for indice, (texto, icono, vista) in enumerate(secciones):
+            btn = QPushButton("  " + texto)
+            btn.setIcon(iconos.icono(icono))
+            btn.setIconSize(QSize(18, 18))
             btn.setCheckable(True)
             btn.clicked.connect(lambda _=False, i=indice: self._cambiar_vista(i))
             sidebar_layout.addWidget(btn)
@@ -109,9 +113,9 @@ class MainWindow(QWidget):
 
     def _cambiar_vista(self, index):
         # La cámara sólo queda abierta mientras se está en la pantalla de marcación
-        if index != 0 and self.view_marcacion.camera_open:
-            self.view_marcacion._cerrar_camara()
         vista = self.content_area.widget(index)
+        if vista is not self.view_marcacion and self.view_marcacion.camera_open:
+            self.view_marcacion._cerrar_camara()
         if hasattr(vista, "refrescar"):
             vista.refrescar()
         self.content_area.setCurrentIndex(index)

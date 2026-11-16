@@ -52,6 +52,24 @@ COLUMNAS_RESUMEN = [
 ]
 
 
+# Gravedad de cada situación, de la más a la menos grave, para darle color
+BIEN, ATENCION, MAL, AVISO, NEUTRO = "bien", "atencion", "mal", "aviso", "neutro"
+_GRAVEDAD = [
+    (MAL, {AUSENTE_SIN_AVISO, AUSENCIA_NO_JUSTIFICADA}),
+    (AVISO, {AUSENTE_CON_AVISO}),
+    (ATENCION, {TARDANZA, SALIDA_ANTICIPADA, SALIDA_SIN_REGISTRAR}),
+    (BIEN, {EN_HORARIO}),
+]
+
+
+def gravedad(etiquetas):
+    """Color que le corresponde a una obligación: manda su situación más grave."""
+    for clave, situaciones in _GRAVEDAD:
+        if situaciones.intersection(etiquetas):
+            return clave
+    return NEUTRO
+
+
 def _situacion_ausente(ausencia, obligacion, ahora):
     if ausencia:
         clave = (ausencia["tipo"], ausencia["estado"])
@@ -135,6 +153,36 @@ def totales(filas):
 def exigibles(filas):
     """Obligaciones que el docente tenía que cumplir: no cuentan las de feriados y recesos."""
     return [f for f in filas if SIN_CLASES not in f["etiquetas"]]
+
+
+def resumen_del_dia(filas_por_docente):
+    """Cuenta a los docentes según cómo va su día. Cada uno cae en un solo grupo.
+
+    filas_por_docente: una lista de filas clasificadas (las de hoy) por docente.
+    No cuentan los que hoy no tienen nada que cumplir (feriado o clase reemplazada).
+    """
+    resumen = {
+        "con_obligaciones": 0, "marcaron": 0, "por_llegar": 0,
+        "con_aviso": 0, "sin_aviso": 0,
+    }
+    for filas in filas_por_docente:
+        cuentan = [
+            f for f in filas
+            if SIN_CLASES not in f["etiquetas"] and REEMPLAZADA not in f["etiquetas"]
+        ]
+        if not cuentan:
+            continue
+        resumen["con_obligaciones"] += 1
+        etiquetas = {e for f in cuentan for e in f["etiquetas"]}
+        if any(f["entrada"] for f in cuentan):
+            resumen["marcaron"] += 1
+        elif etiquetas & {AUSENTE_CON_AVISO, AUSENCIA_NO_JUSTIFICADA}:
+            resumen["con_aviso"] += 1
+        elif AUSENTE_SIN_AVISO in etiquetas:
+            resumen["sin_aviso"] += 1
+        else:
+            resumen["por_llegar"] += 1
+    return resumen
 
 
 def resumen_docente(filas):

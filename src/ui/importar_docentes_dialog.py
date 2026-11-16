@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QHeaderView, QLabel, QVBoxLayout
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QVBoxLayout
 
 from repositories import docente_repository
 from services import importacion_docentes_service
@@ -22,10 +22,6 @@ class ImportarDocentesDialog(QDialog):
         self.tabla = theme.crear_tabla(
             ["Fila", "Docente", "DNI", "CUIL", "Celular", "Correo", "Resultado"]
         )
-        self.tabla.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
-        )
-        self.tabla.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.tabla, 1)
         fila = QHBoxLayout()
         fila.addStretch()
