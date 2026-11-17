@@ -100,6 +100,14 @@ para que ingrese otro.
 
 El esquema completo está en `database/initdb/01-schema.sql`.
 
+![DER del sistema](docs/der.png)
+
+El DER está en DrawSQL:
+<https://drawsql.app/teams/rioja/diagrams/asistencia-docente-ies-7>. Muestra las
+tablas, las columnas y las relaciones; las listas de valores (`ENUM`) figuran ahí
+como texto, y las validaciones (`CHECK`) y las claves únicas están sólo en el
+esquema.
+
 | Tabla | Contenido |
 |---|---|
 | `usuario` | Personal que inicia sesión, con su rol (`administrador` o `administrativo`), si está activo y el hash de su contraseña |
