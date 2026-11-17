@@ -90,7 +90,7 @@ class MainWindow(QWidget):
             ("Horarios", "horarios", HorariosView()),
             ("Actividades especiales", "actividades", ActividadesView(self.nombre_usuario)),
             ("Ausencias", "ausencias", AusenciasView(self.usuario_id)),
-            ("Feriados y recesos", "feriados", NoLaborablesView()),
+            ("Feriados y recesos", "feriados", NoLaborablesView(self.usuario_id)),
             ("Informes", "informes", InformesView(self.usuario_id, self.nombre_usuario)),
         ]
         if usuario["rol"] == usuario_service.ADMINISTRADOR:

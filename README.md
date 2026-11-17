@@ -111,7 +111,7 @@ El esquema completo está en `database/initdb/01-schema.sql`.
 | `actividad_docente` | Docentes de cada actividad; en las mesas, con rol (presidente, vocal, auxiliar) |
 | `asistencia` | Una fila por docente, fecha y obligación: entrada, salida, tardanza, salida anticipada. Si se corrigió a mano, guarda quién, cuándo y el motivo |
 | `ausencia` | Particular o ausencia médica de un docente en una fecha, con su estado |
-| `dia_no_laborable` | Feriado (un día) o receso (de una fecha a otra) |
+| `dia_no_laborable` | Feriado (un día) o receso (de una fecha a otra), con el usuario que lo cargó |
 
 Cambios respecto del sistema original:
 
@@ -270,15 +270,19 @@ Las bases creadas antes de estas funciones necesitan, una sola vez,
   entre usuarios. El nombre de usuario no distingue mayúsculas.
 - **Contraseña olvidada**: el administrador la restablece desde Usuarios.
 - **Bajas**: nadie puede eliminar el usuario con el que está conectado, así que
-  siempre queda un administrador. Un usuario que cargó ausencias o corrigió
-  marcaciones no se borra, para no dejar esos registros sin autor: queda inactivo,
-  no puede ingresar y se puede reactivar.
+  siempre queda un administrador. Un usuario que cargó ausencias, feriados o
+  correcciones de marcaciones no se borra, para no dejar esos registros sin
+  autor: queda inactivo, no puede ingresar y se puede reactivar.
 - El rol se elige al crear el usuario y no se cambia después.
 
 La lógica está en `src/services/usuario_service.py`. Las bases creadas antes de
 esta función necesitan, una sola vez, `database/migraciones/03-usuarios.sql`: los
 usuarios existentes quedan como administradores y su contraseña, que estaba en
 texto plano, se cifra sola la primera vez que ingresan.
+
+Cada feriado o receso guarda qué usuario lo cargó. Las bases anteriores necesitan,
+una sola vez, `database/migraciones/04-feriados-con-usuario.sql`, que deja los ya
+cargados a nombre del primer administrador.
 
 ## Estructura del proyecto
 

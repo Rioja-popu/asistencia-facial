@@ -6,9 +6,11 @@ from config.database import consultar, ejecutar
 def listar():
     return consultar(
         """
-        SELECT id, tipo::text AS tipo, descripcion, fecha_desde, fecha_hasta
-        FROM dia_no_laborable
-        ORDER BY fecha_desde DESC, id DESC;
+        SELECT n.id, n.tipo::text AS tipo, n.descripcion, n.fecha_desde, n.fecha_hasta,
+               u.nombre_usuario
+        FROM dia_no_laborable n
+        JOIN usuario u ON u.id = n.usuario_id
+        ORDER BY n.fecha_desde DESC, n.id DESC;
         """
     )
 
@@ -28,13 +30,13 @@ def del_dia(fecha):
     return [fila["texto"] for fila in filas]
 
 
-def registrar(tipo, descripcion, desde, hasta):
+def registrar(tipo, descripcion, desde, hasta, usuario_id):
     ejecutar(
         """
-        INSERT INTO dia_no_laborable (tipo, descripcion, fecha_desde, fecha_hasta)
-        VALUES (%s, %s, %s, %s);
+        INSERT INTO dia_no_laborable (tipo, descripcion, fecha_desde, fecha_hasta, usuario_id)
+        VALUES (%s, %s, %s, %s, %s);
         """,
-        (tipo, descripcion, desde, hasta),
+        (tipo, descripcion, desde, hasta, usuario_id),
     )
 
 

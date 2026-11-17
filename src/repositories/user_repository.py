@@ -27,12 +27,13 @@ def obtener(usuario_id):
 
 
 def listar():
-    """Todos los usuarios; `con_historial` indica si ya cargó ausencias o correcciones."""
+    """Todos los usuarios; `con_historial` indica si hay registros cargados a su nombre."""
     return consultar(
         f"""
         SELECT {_CAMPOS},
                EXISTS (SELECT 1 FROM ausencia a WHERE a.usuario_id = u.id)
                OR EXISTS (SELECT 1 FROM asistencia s WHERE s.corregida_por = u.id)
+               OR EXISTS (SELECT 1 FROM dia_no_laborable n WHERE n.usuario_id = u.id)
                AS con_historial
         FROM usuario u
         ORDER BY activo DESC, LOWER(nombre_usuario);

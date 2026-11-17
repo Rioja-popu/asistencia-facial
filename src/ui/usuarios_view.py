@@ -174,12 +174,12 @@ class UsuariosView(QWidget):
             if not usuario["activo"]:
                 theme.avisar(
                     self, "Usuario inactivo",
-                    f"\"{nombre}\" ya está inactivo. No se borra porque cargó ausencias o "
-                    "corrigió marcaciones, y esos registros conservan su nombre.",
+                    f"\"{nombre}\" ya está inactivo. No se borra porque cargó ausencias, "
+                    "feriados o correcciones, y esos registros conservan su nombre.",
                 )
                 return
             pregunta = (
-                f"\"{nombre}\" cargó ausencias o corrigió marcaciones, así que no se borra: "
+                f"\"{nombre}\" cargó ausencias, feriados o correcciones, así que no se borra: "
                 "queda inactivo y ya no puede ingresar. ¿Desactivarlo?"
             )
         else:

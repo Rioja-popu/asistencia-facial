@@ -172,6 +172,8 @@ CREATE TABLE dia_no_laborable(
     descripcion VARCHAR(255) NOT NULL,
     fecha_desde DATE NOT NULL,
     fecha_hasta DATE NOT NULL,
+    -- Quién lo cargó
+    usuario_id INT NOT NULL,
     PRIMARY KEY(id),
     CONSTRAINT dia_no_laborable_periodo_check CHECK (fecha_hasta >= fecha_desde)
 );
@@ -229,3 +231,5 @@ ALTER TABLE
     ausencia ADD CONSTRAINT ausencia_usuario_id_foreign FOREIGN KEY(usuario_id) REFERENCES usuario(id);
 ALTER TABLE
     asistencia ADD CONSTRAINT asistencia_corregida_por_foreign FOREIGN KEY(corregida_por) REFERENCES usuario(id);
+ALTER TABLE
+    dia_no_laborable ADD CONSTRAINT dia_no_laborable_usuario_id_foreign FOREIGN KEY(usuario_id) REFERENCES usuario(id);

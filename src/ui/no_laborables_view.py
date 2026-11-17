@@ -18,8 +18,9 @@ TIPOS = {"feriado": "Feriado", "receso": "Receso"}
 class NoLaborablesView(QWidget):
     """Feriados y recesos: esos días las clases habituales no cuentan como ausencia."""
 
-    def __init__(self):
+    def __init__(self, usuario_id):
         super().__init__()
+        self.usuario_id = usuario_id
         self.registros = {}
 
         layout = QVBoxLayout(self)
@@ -56,7 +57,7 @@ class NoLaborablesView(QWidget):
         layout.addWidget(theme.boton("Agregar", "confirmar", self._agregar))
 
         self.tabla = theme.crear_tabla(
-            ["Tipo", "Descripción", "Desde", "Hasta", "Días"],
+            ["Tipo", "Descripción", "Desde", "Hasta", "Días", "Cargado por"],
             "Todavía no hay feriados ni recesos cargados.",
         )
         layout.addWidget(self.tabla)
@@ -90,6 +91,7 @@ class NoLaborablesView(QWidget):
                     theme.fecha(r["fecha_desde"]),
                     theme.fecha(r["fecha_hasta"]),
                     (r["fecha_hasta"] - r["fecha_desde"]).days + 1,
+                    r["nombre_usuario"],
                 ]
                 for r in registros
             ],
@@ -107,7 +109,9 @@ class NoLaborablesView(QWidget):
             theme.avisar(self, "Período inválido", "La fecha 'hasta' es anterior a 'desde'.")
             return
         try:
-            repo.registrar(self.combo_tipo.currentData(), descripcion, desde, hasta)
+            repo.registrar(
+                self.combo_tipo.currentData(), descripcion, desde, hasta, self.usuario_id
+            )
         except Exception as e:
             theme.error_bd(self, e)
             return
